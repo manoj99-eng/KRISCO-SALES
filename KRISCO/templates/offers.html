@@ -183,7 +183,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': csrf_token,  // Include CSRF token in headers
+                        'X-CSRFToken': '{{ csrf_token }}',  // Include CSRF token in headers
                     },
                     body: JSON.stringify({ sku: sku, quantity: newQuantity }),
                 })
