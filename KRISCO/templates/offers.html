@@ -82,11 +82,11 @@
             </tbody>
             <tfoot id="grand-total-row">
                 <tr>
-                    <td>GRAND TOTAL </td>
-                    <td>Total Quantity:</td>
-                    <td id="total-quantity">0</td>
-                    <td>Total Price:</td>
-                    <td id="total-price">0.00</td>
+                    <td colspan="1">GRAND TOTAL </td>
+                    <td></td>
+                    <td></td>
+                    <td id="total-quantity">0 </td>
+                    <td id="total-price">0.00 &nbsp;$</td>
                 </tr>
             </tfoot>
         </table>
@@ -176,6 +176,49 @@
                 });
             });
 
+            // Add event listener for Submit button
+submitBtn.addEventListener('click', function () {
+    // Collect data from the preview table
+    const previewData = [];
+    document.querySelectorAll('#preview-table tbody tr').forEach(function (row) {
+        previewData.push({
+            sku: row.querySelector('td:nth-child(1)').innerText,
+            upc: row.querySelector('td:nth-child(2)').innerText,
+            description: row.querySelector('td:nth-child(3)').innerText,
+            entered_quantity: parseInt(row.querySelector('td:nth-child(4)').innerText, 10),
+            offered_price: parseFloat(row.querySelector('td.offered-price').innerText),
+        });
+    });
+
+    // Check if previewData is not empty before sending
+    if (previewData.length > 0) {
+        // Send the data to the server
+        fetch('{% url "submit-preview" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}',  // Include CSRF token in headers
+            },
+            body: JSON.stringify({ previewData: previewData }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('Preview submitted successfully.');
+                console.log('DataFrame:', data.dataframe);
+                // Redirect to the thankyou.html page
+                window.location.href = '{% url "thank-you" %}';
+            } else {
+                console.error('Failed to submit preview.');
+            }
+        })
+        .catch(error => {
+            console.error('Error while submitting preview:', error);
+        });
+    } else {
+        console.error('Preview data is empty. Please add items to submit.');
+    }
+});
             // Function to update quantity in the database
             function updateQuantityInDatabase(sku, newQuantity) {
                 // Make an asynchronous request to update the quantity in the database
@@ -187,17 +230,22 @@
                     },
                     body: JSON.stringify({ sku: sku, quantity: newQuantity }),
                 })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            console.log('Quantity updated in the database.');
-                        } else {
-                            console.error('Failed to update quantity in the database.');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error while updating quantity in the database:', error);
-                    });
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to update quantity for SKU ${sku}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        console.log('Quantity updated in the database.');
+                    } else {
+                        console.error('Failed to update quantity in the database.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error while updating quantity in the database:', error);
+                });
             }
 
             // Function to update the Grand Total row

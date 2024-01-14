@@ -4,6 +4,11 @@ from django.http import JsonResponse
 from django.db import models
 import pandas as pd
 from .models import Weekly_Offers
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+import json
 
 class WeeklyOffersView(View):
     template_name = 'offers.html'
@@ -58,3 +63,28 @@ def update_quantity_view(request):
             return JsonResponse({'success': False, 'error': 'Offer not found'})
 
     return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class SubmitPreviewView(View):
+    def post(self, request, *args, **kwargs):
+        try:
+            # Get the JSON data from the request
+            data = json.loads(request.body.decode('utf-8'))
+            print('Received data:', data)  # Add this line for debugging
+
+            # Process the data, create a DataFrame, and perform any required actions
+            dataframe = pd.DataFrame(data['previewData'])
+
+            print('DataFrame:', dataframe)  # Add this line for debugging
+
+            # Return a JSON response with success and DataFrame data
+            return JsonResponse({'success': True, 'dataframe': dataframe.to_dict(orient='records')})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+class ThankYouView(View):
+    template_name = 'thankyou.html'
+
+    def get(self, request, *args, **kwargs):
+        return render(request, self.template_name)
