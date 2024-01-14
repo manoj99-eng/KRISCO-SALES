@@ -1,14 +1,19 @@
 from django.shortcuts import render
 from django.views import View
 from django.http import JsonResponse
+from django.conf import settings
 from django.db import models
 import pandas as pd
 from .models import Weekly_Offers
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
 import json
+from django.core.mail import send_mail, EmailMessage
+from io import BytesIO
+from django.utils import timezone
+import logging
+
+logger = logging.getLogger(__name__)
 
 class WeeklyOffersView(View):
     template_name = 'offers.html'
@@ -64,25 +69,42 @@ def update_quantity_view(request):
 
     return JsonResponse({'success': False, 'error': 'Invalid request'})
 
-
-
 @method_decorator(csrf_exempt, name='dispatch')
 class SubmitPreviewView(View):
     def post(self, request, *args, **kwargs):
         try:
             # Get the JSON data from the request
             data = json.loads(request.body.decode('utf-8'))
-            print('Received data:', data)  # Add this line for debugging
+            logger.info('Received data: %s', data)
 
-            # Process the data, create a DataFrame, and perform any required actions
+            # Process the data, create a DataFrame
             dataframe = pd.DataFrame(data['previewData'])
+            logger.info('DataFrame: %s', dataframe)
 
-            print('DataFrame:', dataframe)  # Add this line for debugging
+            # Convert DataFrame to Excel in-memory
+            excel_buffer = BytesIO()
+            dataframe.to_excel(excel_buffer, index=False)
+            excel_buffer.seek(0)
+
+            # Send email with Excel attachment
+            subject = f'Preview Data - {timezone.now().strftime("%Y-%m-%d-%H:%M:%S")}'
+            message = 'Please find the attached Excel file with your preview data.'
+            from_email = settings.EMAIL_HOST_USER  # Update with your email
+            recipient_list = [request.user.email]  # Assuming the user is logged in
+
+            email = EmailMessage(subject, message, from_email, recipient_list)
+            email.attach('preview_data.xlsx', excel_buffer.read(), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            email.send()
+
+            # Close the buffer to free up resources
+            excel_buffer.close()
 
             # Return a JSON response with success and DataFrame data
             return JsonResponse({'success': True, 'dataframe': dataframe.to_dict(orient='records')})
         except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
+            logger.error('Error processing preview data: %s', str(e))
+            return JsonResponse({'success': False, 'error': 'Failed to process preview data'})
+
 class ThankYouView(View):
     template_name = 'thankyou.html'
 
