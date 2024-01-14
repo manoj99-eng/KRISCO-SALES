@@ -179,7 +179,7 @@
             // Function to update quantity in the database
             function updateQuantityInDatabase(sku, newQuantity) {
                 // Make an asynchronous request to update the quantity in the database
-                fetch('/update-quantity/', {
+                fetch('{% url "update-quantity" %}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
