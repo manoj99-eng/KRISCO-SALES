@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+
+{% block content %}
+    <main>
+        <form id="offers-form" method="get" action="{% url 'weekly-offers' %}">
+            <label for="brand">Brand:</label>
+            <select name="brand">
+                <option value="" selected>All Brands</option>
+                {% for brand in unique_brands %}
+                    <option value="{{ brand }}">{{ brand }}</option>
+                {% endfor %}
+            </select>
+            <label for="category">Category:</label>
+            <select name="category">
+                <option value="" selected>All Categories</option>
+                {% for category in unique_categories %}
+                    <option value="{{ category }}">{{ category }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Filter</button>
+        </form>
+
+        <table class="table table-striped table-hover" id="items-table">
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>UPC</th>
+                    <th>DESCRIPTION</th>
+                    <th>AVAILABLE</th>
+                    <th>MSRP</th>
+                    <th>DISCOUNT</th>
+                    <th>OFFER</th>
+                    <th>REQUIRED</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                    <tr data-sku="{{ item.sku }}">
+                        <td>{{ item.sku }}</td>
+                        <td>{{ item.upc }}</td>
+                        <td>{{ item.description }}</td>
+                        <td class="available-qty">{{ item.available_qty }}</td>
+                        <td>{{ item.msrp }}</td>
+                        <td>{{ item.discount }}</td>
+                        <td>{{ item.offer_price }}</td>
+                        <td>
+                            <input type="number" name="quantity" required>
+                        </td>
+                        <td><button type="button" class="add-btn">Add</button></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <button type="button" id="submit-btn">Submit</button>
+        <table class="table table-striped table-hover" id="preview-table">
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>UPC</th>
+                    <th>DESCRIPTION</th>
+                    <th>Entered Quantity</th>
+                    <th>Offered Price</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="preview-body">
+                {% for index, row in temporary_dataframe.iterrows %}
+                    <tr>
+                        <td>{{ row.sku }}</td>
+                        <td>{{ sku_info|get_item:row.sku|get_item:"upc" }}</td>
+                        <td>{{ row.description }}</td>
+                        <td>{{ row.entered_quantity }}</td>
+                        <td class="offered-price">{{ sku_info|get_item:row.sku|get_item:"offered_price" }}</td>
+                        <td>
+                            <button type="button" class="remove-btn" data-sku="{{ row.sku }}">Remove</button>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot id="grand-total-row">
+                <tr>
+                    <td>GRAND TOTAL </td>
+                    <td>Total Quantity:</td>
+                    <td id="total-quantity">0</td>
+                    <td>Total Price:</td>
+                    <td id="total-price">0.00</td>
+                </tr>
+            </tfoot>
+        </table>
+    </main>
+
+    <!-- JavaScript Section -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const submitBtn = document.getElementById('submit-btn');
+            const previewBody = document.getElementById('preview-body');
+            const grandTotalRow = document.getElementById('grand-total-row');
+            const totalQuantityElement = document.getElementById('total-quantity');
+            const totalPriceElement = document.getElementById('total-price');
+
+            // Add event listener for Remove buttons
+            previewBody.addEventListener('click', function (event) {
+                if (event.target.classList.contains('remove-btn')) {
+                    const row = event.target.closest('tr');
+                    const sku = row.querySelector('td:nth-child(1)').innerText;
+                    const enteredQuantity = parseInt(row.querySelector('td:nth-child(4)').innerText, 10);
+                    const offeredPrice = parseFloat(row.querySelector('td.offered-price').innerText);
+
+                    // Remove the row from the preview table
+                    row.remove();
+
+                    // Update available quantity in the original items table
+                    const originalRow = document.querySelector(`#items-table tr[data-sku="${sku}"]`);
+                    const availableQtyCell = originalRow.querySelector('.available-qty');
+                    const currentAvailableQuantity = parseInt(availableQtyCell.innerText, 10);
+                    availableQtyCell.innerText = currentAvailableQuantity + enteredQuantity;
+
+                    // Update the quantity in the database
+                    updateQuantityInDatabase(sku, currentAvailableQuantity + enteredQuantity);
+
+                    // Update the Grand Total row
+                    updateGrandTotal(-enteredQuantity, -offeredPrice);
+                }
+            });
+
+            // This section is responsible for adding items to the preview table
+            document.querySelectorAll('#items-table .add-btn').forEach(function (addBtn) {
+                addBtn.addEventListener('click', function () {
+                    const row = addBtn.closest('tr');
+                    const sku = row.querySelector('td:nth-child(1)').innerText;
+                    const upc = row.querySelector('td:nth-child(2)').innerText;
+                    const description = row.querySelector('td:nth-child(3)').innerText;
+                    const availableQty = parseInt(row.querySelector('td:nth-child(4)').innerText, 10);
+                    const msrp = parseFloat(row.querySelector('td:nth-child(5)').innerText);
+                    const discount = parseFloat(row.querySelector('td:nth-child(6)').innerText);
+                    const offerPrice = parseFloat(row.querySelector('td:nth-child(7)').innerText);
+                    const requiredQuantityInput = row.querySelector('input[name="quantity"]');
+                    const requiredQuantity = parseInt(requiredQuantityInput.value, 10);
+
+                    // Check if the required quantity is valid
+                    if (requiredQuantity > 0 && requiredQuantity <= availableQty) {
+                        // Calculate offered price for the entered quantity
+                        const offeredPriceForQuantity = offerPrice * requiredQuantity;
+
+                        // Add the row to the preview table
+                        const previewRow = document.createElement('tr');
+                        previewRow.innerHTML = `
+                            <td>${sku}</td>
+                            <td>${upc}</td>
+                            <td>${description}</td>
+                            <td>${requiredQuantity}</td>
+                            <td class="offered-price">${offeredPriceForQuantity.toFixed(2)}</td>
+                            <td>
+                                <button type="button" class="remove-btn" data-sku="${sku}">Remove</button>
+                            </td>
+                        `;
+                        previewBody.appendChild(previewRow);
+
+                        // Update available quantity in the original items table
+                        const originalRow = document.querySelector(`#items-table tr[data-sku="${sku}"]`);
+                        const availableQtyCell = originalRow.querySelector('.available-qty');
+                        availableQtyCell.innerText = availableQty - requiredQuantity;
+
+                        // Update the quantity in the database
+                        updateQuantityInDatabase(sku, availableQty - requiredQuantity);
+
+                        // Update the Grand Total row
+                        updateGrandTotal(requiredQuantity, offeredPriceForQuantity);
+                    } else {
+                        // Handle invalid quantity (show an error message, etc.)
+                        alert('Invalid quantity. Please enter a valid quantity.');
+                    }
+                });
+            });
+
+            // Function to update quantity in the database
+            function updateQuantityInDatabase(sku, newQuantity) {
+                // Make an asynchronous request to update the quantity in the database
+                fetch('/update-quantity/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrf_token,  // Include CSRF token in headers
+                    },
+                    body: JSON.stringify({ sku: sku, quantity: newQuantity }),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            console.log('Quantity updated in the database.');
+                        } else {
+                            console.error('Failed to update quantity in the database.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error while updating quantity in the database:', error);
+                    });
+            }
+
+            // Function to update the Grand Total row
+            function updateGrandTotal(enteredQuantity, offeredPrice) {
+                // Get the current total quantity and total price
+                let currentTotalQuantity = parseInt(totalQuantityElement.innerText, 10);
+                let currentTotalPrice = parseFloat(totalPriceElement.innerText);
+
+                // Update the total quantity and total price
+                currentTotalQuantity += enteredQuantity;
+                currentTotalPrice += offeredPrice;
+
+                // Update the Grand Total row
+                totalQuantityElement.innerText = currentTotalQuantity;
+                totalPriceElement.innerText = currentTotalPrice.toFixed(2);
+            }
+        });
+    </script>
+{% endblock %}

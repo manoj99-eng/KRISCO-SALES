@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LOGIN</title>
+</head>
+<header>
+    {% block menubar %}{% endblock %}
+</header>
+{% block content %}
+<body>
+    <div class="login-div">
+        <div class="login-title">
+            <h3>SIGN-IN TO SERVICE_VERSE</h3>
+        </div>
+        <div class="login-sub-title">Services at your door Step</div>
+        <div class="login-fields">
+            <form method="post">
+                {% csrf_token %}
+                <div class="username">
+                    <input type="Username" name="username" placeholder="Username" />
+                </div>
+                <div class="password">
+                    <input type="password" name="password" placeholder="password" />
+                </div>
+        </div>
+        <button class="signin-button" type="submit">SIGN IN</button>
+        </form>
+        <div class="login-link">
+            <a href="{%url 'password_reset' %}">Forgot Password ?</a> or <a href="/accounts/register/">Sign up</a>
+            <br>
+            {% for message in messages %}
+            <span>{{message}}</span>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+{% endblock %}
+</html>
