@@ -1,42 +1,87 @@
 {% extends 'base.html' %}
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOGIN</title>
-</head>
 <header>
     {% block menubar %}{% endblock %}
 </header>
 {% block content %}
-<body>
-    <div class="login-div">
-        <div class="login-title">
-            <h3>SIGN-IN TO SERVICE_VERSE</h3>
-        </div>
-        <div class="login-sub-title">Services at your door Step</div>
-        <div class="login-fields">
-            <form method="post">
-                {% csrf_token %}
-                <div class="username">
-                    <input type="Username" name="username" placeholder="Username" />
-                </div>
-                <div class="password">
-                    <input type="password" name="password" placeholder="password" />
-                </div>
-        </div>
-        <button class="signin-button" type="submit">SIGN IN</button>
-        </form>
-        <div class="login-link">
-            <a href="{%url 'password_reset' %}">Forgot Password ?</a> or <a href="/accounts/register/">Sign up</a>
+<style>
+    .bd-placeholder-img {
+      font-size: 1.125rem;
+      text-anchor: middle;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      user-select: none;
+    }
+
+    @media (min-width: 768px) {
+      .bd-placeholder-img-lg {
+        font-size: 3.5rem;
+      }
+    }
+    .form-signin {
+      width: 100%;
+      max-width: 330px;
+      padding: 15px;
+      margin: auto;
+    }
+
+    .form-signin .checkbox {
+      font-weight: 400;
+    }
+
+    .form-signin .form-floating:focus-within {
+     z-index: 2;
+    }
+
+    .form-signin input[type="email"] {
+      margin-bottom: -1px;
+      border-bottom-right-radius: 0;
+      border-bottom-left-radius: 0;
+    }
+
+    .form-signin input[type="password"] {
+      margin-bottom: 10px;
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+    }
+</style>
+<body class="text-center">
+    <main class="form-signin">
+        <img class="mb-4" src="https://dl.dropbox.com/scl/fi/42ipbrso5vxm2xbuaemlj/logo.png?rlkey=z041rnchnv4awwqh4ngycszrc&dl=0" alt="" width="72" height="57">
+        <div class="login-div">
+            <div class="login-title">
+                <h3>SIGN-IN</h3>
+            </div>
+            <div class="login-sub-title">Services at your door Step</div>
             <br>
-            {% for message in messages %}
-            <span>{{message}}</span>
-            {% endfor %}
+            <div class="login-fields">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="form-floating">
+                        <input type="Username" name="username" class="form-control" id="floatingInput" placeholder="name@example.com">
+                        <label for="floatingInput">User Name</label>
+                    </div>
+                    <div class="form-floating">
+                        <input type="password" name="password" class="form-control" id="floatingPassword" placeholder="Password">
+                        <label for="floatingPassword">Password</label>
+                    </div>
+                    <div class="checkbox mb-3">
+                        <label>
+                          <input type="checkbox" value="remember-me"> Remember me
+                        </label>
+                      </div>
+            </div>
+            <button class="w-100 btn btn-lg btn-primary" type="submit">Sign in</button>
+            <p class="mt-5 mb-3 text-muted">&copy; 2016–2024</p>
+            <div class="login-link">
+                <a href="{%url 'password_reset' %}">Forgot Password ?</a> or <a href="/accounts/register/">Sign up</a>
+                <br>
+                {% for message in messages %}
+                <span>{{message}}</span>
+                {% endfor %}
+            </div>
         </div>
-    </div>
+    </main>
 </body>
 {% endblock %}
 </html>

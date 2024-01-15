@@ -47,15 +47,15 @@ def register(request):
                 username=username, password=password, email=email)
             mydict = {'username': username}
             user.save()
-            html_template = 'register_email.html'
-            html_message = render_to_string(html_template, context=mydict)
-            subject = 'Welcome to Service-Verse'
-            email_from = settings.EMAIL_HOST_USER
-            recipient_list = [email]
-            message = EmailMessage(subject, html_message,
-                                   email_from, recipient_list)
-            message.content_subtype = 'html'
-            message.send()
+            # html_template = 'register_email.html'
+            # html_message = render_to_string(html_template, context=mydict)
+            # subject = 'Welcome to Service-Verse'
+            # email_from = settings.EMAIL_HOST_USER
+            # recipient_list = [email]
+            # message = EmailMessage(subject, html_message,
+            #                        email_from, recipient_list)
+            # message.content_subtype = 'html'
+            # message.send()
             return redirect("login")
     else:
         return render(request, 'register.html')

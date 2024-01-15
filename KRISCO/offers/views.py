@@ -8,10 +8,12 @@ from .models import Weekly_Offers
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 import json
-from django.core.mail import send_mail, EmailMessage
+from django.core.mail import EmailMessage
 from io import BytesIO
 from django.utils import timezone
 import logging
+from openpyxl import Workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +23,7 @@ class WeeklyOffersView(View):
     def get(self, request, *args, **kwargs):
         brand = request.GET.get('brand', '')
         category = request.GET.get('category', '')
-        
+
         items = Weekly_Offers.objects.all()
 
         if brand:
@@ -42,7 +44,7 @@ class WeeklyOffersView(View):
 
 class AddToPreviewView(View):
     def post(self, request, *args, **kwargs):
-        data = request.POST.getlist('data[]')
+        data = json.loads(request.body.decode('utf-8'))
         columns = ['SKU', 'UPC', 'Description', 'Quantity', 'Price']
         df = pd.DataFrame(data, columns=columns)
 
@@ -58,7 +60,6 @@ def update_quantity_view(request):
         sku = request.POST.get('sku')
         quantity = request.POST.get('quantity')
 
-        # Perform the logic to update the quantity in the database based on the SKU
         try:
             weekly_offer = Weekly_Offers.objects.get(sku=sku)
             weekly_offer.available_qty = quantity
@@ -73,33 +74,53 @@ def update_quantity_view(request):
 class SubmitPreviewView(View):
     def post(self, request, *args, **kwargs):
         try:
-            # Get the JSON data from the request
             data = json.loads(request.body.decode('utf-8'))
             logger.info('Received data: %s', data)
 
-            # Process the data, create a DataFrame
             dataframe = pd.DataFrame(data['previewData'])
             logger.info('DataFrame: %s', dataframe)
 
-            # Convert DataFrame to Excel in-memory
+            grand_total_row = {
+                'sku' : '-',
+                'upc' : '-',
+                'description': 'Grand Total:',
+                'entered_quantity': dataframe['entered_quantity'].sum(),
+                'offered_price': dataframe['offered_price'].sum(),
+            }
+
+            grand_total_df = pd.DataFrame([grand_total_row])
+            dataframe = pd.concat([dataframe, grand_total_df], ignore_index=True)
+
+            workbook = Workbook()
+            sheet = workbook.active
+
+            for row in dataframe_to_rows(dataframe, index=False, header=True):
+                sheet.append(row)
+
+            for column in sheet.columns:
+                max_length = 0
+                column = [cell for cell in column]
+                max_length = max(len(str(cell.value)) for cell in column)
+                adjusted_width = (max_length + 2)
+                sheet.column_dimensions[column[0].column_letter].width = adjusted_width
+
             excel_buffer = BytesIO()
-            dataframe.to_excel(excel_buffer, index=False)
+            workbook.save(excel_buffer)
             excel_buffer.seek(0)
 
-            # Send email with Excel attachment
-            subject = f'Preview Data - {timezone.now().strftime("%Y-%m-%d-%H:%M:%S")}'
-            message = 'Please find the attached Excel file with your preview data.'
-            from_email = settings.EMAIL_HOST_USER  # Update with your email
-            recipient_list = [request.user.email]  # Assuming the user is logged in
+            subject = f'ORDER ID - {timezone.now().strftime("%Y-%m-%d-%H:%M:%S.%f")}'
+            message = 'Please find the attached Excel file containing the order details.'
+            from_email = settings.EMAIL_HOST_USER
+            recipient_list = [request.user.email]
+            cc_email = 'support10@pbkriscosales.net'
+            recipient_list_with_cc = [request.user.email, cc_email]
 
-            email = EmailMessage(subject, message, from_email, recipient_list)
+            email = EmailMessage(subject, message, from_email, recipient_list_with_cc)
             email.attach('preview_data.xlsx', excel_buffer.read(), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             email.send()
 
-            # Close the buffer to free up resources
             excel_buffer.close()
 
-            # Return a JSON response with success and DataFrame data
             return JsonResponse({'success': True, 'dataframe': dataframe.to_dict(orient='records')})
         except Exception as e:
             logger.error('Error processing preview data: %s', str(e))

@@ -1,0 +1,14 @@
+<!-- templates/admin/import_csv.html -->
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+    <div class="module">
+        <h2>Import CSV</h2>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <label for="csv_file">Choose CSV file:</label>
+            <input type="file" name="csv_file" accept=".csv">
+            <input type="submit" value="Import">
+        </form>
+    </div>
+{% endblock %}

@@ -3,93 +3,107 @@
 
 {% block content %}
     <main>
-        <form id="offers-form" method="get" action="{% url 'weekly-offers' %}">
-            <label for="brand">Brand:</label>
-            <select name="brand">
-                <option value="" selected>All Brands</option>
-                {% for brand in unique_brands %}
-                    <option value="{{ brand }}">{{ brand }}</option>
-                {% endfor %}
-            </select>
-            <label for="category">Category:</label>
-            <select name="category">
-                <option value="" selected>All Categories</option>
-                {% for category in unique_categories %}
-                    <option value="{{ category }}">{{ category }}</option>
-                {% endfor %}
-            </select>
-            <button type="submit">Filter</button>
-        </form>
-
-        <table class="table table-striped table-hover" id="items-table">
-            <thead>
-                <tr>
-                    <th>SKU</th>
-                    <th>UPC</th>
-                    <th>DESCRIPTION</th>
-                    <th>AVAILABLE</th>
-                    <th>MSRP</th>
-                    <th>DISCOUNT</th>
-                    <th>OFFER</th>
-                    <th>REQUIRED</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in items %}
-                    <tr data-sku="{{ item.sku }}">
-                        <td>{{ item.sku }}</td>
-                        <td>{{ item.upc }}</td>
-                        <td>{{ item.description }}</td>
-                        <td class="available-qty">{{ item.available_qty }}</td>
-                        <td>{{ item.msrp }}</td>
-                        <td>{{ item.discount }}</td>
-                        <td>{{ item.offer_price }}</td>
-                        <td>
-                            <input type="number" name="quantity" required>
-                        </td>
-                        <td><button type="button" class="add-btn">Add</button></td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-
-        <button type="button" id="submit-btn">Submit</button>
-        <table class="table table-striped table-hover" id="preview-table">
-            <thead>
-                <tr>
-                    <th>SKU</th>
-                    <th>UPC</th>
-                    <th>DESCRIPTION</th>
-                    <th>Entered Quantity</th>
-                    <th>Offered Price</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="preview-body">
-                {% for index, row in temporary_dataframe.iterrows %}
+        <center><h1>CUSTOM ORDERS</h1></center>
+        <br>
+        <div class="container">
+            <form id="offers-form" method="get" action="{% url 'weekly-offers' %}">
+                <label for="brand">Brand:</label>
+                <select name="brand">
+                    <option value="" selected>All Brands</option>
+                    {% for brand in unique_brands %}
+                        <option value="{{ brand }}">{{ brand }}</option>
+                    {% endfor %}
+                </select>
+                <label for="category">Category:</label>
+                <select name="category">
+                    <option value="" selected>All Categories</option>
+                    {% for category in unique_categories %}
+                        <option value="{{ category }}">{{ category }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-primary">Filter</button>
+            </form>
+        </div>
+        <br>
+        <div class="container">
+            <table class="table table-striped table-bordered border-primary table-hover" id="items-table">
+                <thead>
                     <tr>
-                        <td>{{ row.sku }}</td>
-                        <td>{{ sku_info|get_item:row.sku|get_item:"upc" }}</td>
-                        <td>{{ row.description }}</td>
-                        <td>{{ row.entered_quantity }}</td>
-                        <td class="offered-price">{{ sku_info|get_item:row.sku|get_item:"offered_price" }}</td>
-                        <td>
-                            <button type="button" class="remove-btn" data-sku="{{ row.sku }}">Remove</button>
-                        </td>
+                        <th>SKU</th>
+                        <th>UPC</th>
+                        <th>DESCRIPTION</th>
+                        <th>AVAILABLE</th>
+                        <th>MSRP</th>
+                        <th>DISCOUNT</th>
+                        <th>OFFER</th>
+                        <th>REQUIRED</th>
+                        <th>ACTION</th>
                     </tr>
-                {% endfor %}
-            </tbody>
-            <tfoot id="grand-total-row">
-                <tr>
-                    <td colspan="1">GRAND TOTAL </td>
-                    <td></td>
-                    <td></td>
-                    <td id="total-quantity">0 </td>
-                    <td id="total-price">0.00 &nbsp;$</td>
-                </tr>
-            </tfoot>
-        </table>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                        <tr data-sku="{{ item.sku }}">
+                            <td>{{ item.sku }}</td>
+                            <td>{{ item.upc }}</td>
+                            <td>{{ item.description }}</td>
+                            <td class="available-qty">{{ item.available_qty }}</td>
+                            <td>{{ item.msrp }}</td>
+                            <td>{{ item.discount }}</td>
+                            <td>{{ item.offer_price }}</td>
+                            <td>
+                                <input type="number" name="quantity" required class="form-control">
+                            </td>
+                            <td><button type="button" class="add-btn btn btn-primary">Add</button></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <center><h1>REVIEW AND SUBMIT YOUR ORDER</h1></center>
+        <div class="container">
+            <div class="d-grid gap-2">
+                <button class="btn btn-primary" id="submit-btn" type="button">SUBMIT</button>
+            </div>
+        </div>
+        <br>
+        <div class="container">
+            <table class="table table-striped table-bordered border-primary table-hover" id="preview-table">
+                <thead>
+                    <tr>
+                        <th>SKU</th>
+                        <th>UPC</th>
+                        <th>DESCRIPTION</th>
+                        <th>ENTERED QUANTITY</th>
+                        <th>OFFERED PRICE</th>
+                        <th>ACTION</th>
+                    </tr>
+                </thead>
+                <tbody id="preview-body">
+                    {% for index, row in temporary_dataframe.iterrows %}
+                        <tr>
+                            <td>{{ row.sku }}</td>
+                            <td>{{ sku_info|get_item:row.sku|get_item:"upc" }}</td>
+                            <td>{{ row.description }}</td>
+                            <td>{{ row.entered_quantity }}</td>
+                            <td class="offered-price">{{ sku_info|get_item:row.sku|get_item:"offered_price" }}</td>
+                            <td>
+                                <button type="button" class="remove-btn" data-sku="{{ row.sku }}">Remove</button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot id="grand-total-row">
+                    <tr>
+                        <td colspan="1">GRAND TOTAL </td>
+                        <td></td>
+                        <td></td>
+                        <td id="total-quantity">0 </td>
+                        <td id="total-price">0.00 &nbsp;$</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
     </main>
 
     <!-- JavaScript Section -->
@@ -177,56 +191,69 @@
             });
 
             // Add event listener for Submit button
-submitBtn.addEventListener('click', function () {
-    // Collect data from the preview table
-    const previewData = [];
-    document.querySelectorAll('#preview-table tbody tr').forEach(function (row) {
-        previewData.push({
-            sku: row.querySelector('td:nth-child(1)').innerText,
-            upc: row.querySelector('td:nth-child(2)').innerText,
-            description: row.querySelector('td:nth-child(3)').innerText,
-            entered_quantity: parseInt(row.querySelector('td:nth-child(4)').innerText, 10),
-            offered_price: parseFloat(row.querySelector('td.offered-price').innerText),
-        });
-    });
+            submitBtn.addEventListener('click', function () {
+                // Collect data from the preview table
+                const previewData = [];
+                document.querySelectorAll('#preview-table tbody tr').forEach(function (row) {
+                    previewData.push({
+                        sku: row.querySelector('td:nth-child(1)').innerText,
+                        upc: row.querySelector('td:nth-child(2)').innerText,
+                        description: row.querySelector('td:nth-child(3)').innerText,
+                        entered_quantity: parseInt(row.querySelector('td:nth-child(4)').innerText, 10),
+                        offered_price: parseFloat(row.querySelector('td.offered-price').innerText),
+                    });
+                });
 
-    // Check if previewData is not empty before sending
-    if (previewData.length > 0) {
-        // Send the data to the server
-        fetch('{% url "submit-preview" %}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}',  // Include CSRF token in headers
-            },
-            body: JSON.stringify({ previewData: previewData }),
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                console.log('Preview submitted successfully.');
-                console.log('DataFrame:', data.dataframe);
-                // Redirect to the thankyou.html page
-                window.location.href = '{% url "thank-you" %}';
-            } else {
-                console.error('Failed to submit preview.');
-            }
-        })
-        .catch(error => {
-            console.error('Error while submitting preview:', error);
-        });
-    } else {
-        console.error('Preview data is empty. Please add items to submit.');
-    }
-});
+                // Check if previewData is not empty before sending
+                if (previewData.length > 0) {
+                    // Log the data before sending
+                    console.log('Preview Data:', previewData);
+
+                    // Send the data to the server
+                    fetch('{% url "submit-preview" %}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token }}',  // Include CSRF token in headers
+                        },
+                        body: JSON.stringify({ previewData: previewData }),
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            console.log('Preview submitted successfully.');
+                            console.log('DataFrame:', data.dataframe);
+                            // Redirect to the thankyou.html page
+                            window.location.href = '{% url "thank-you" %}';
+                        } else {
+                            console.error('Failed to submit preview.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error while submitting preview:', error);
+                    });
+                } else {
+                    console.error('Preview data is empty. Please add items to submit.');
+                }
+            });
+
             // Function to update quantity in the database
             function updateQuantityInDatabase(sku, newQuantity) {
+                // Before the fetch request to update quantity in the database
+                console.log('Updating quantity for SKU:', sku, 'to new quantity:', newQuantity);
+
+                // Check for NaN values and handle them
+                if (isNaN(newQuantity)) {
+                    console.error('Invalid new quantity. Skipping update.');
+                    return;
+                }
+
                 // Make an asynchronous request to update the quantity in the database
                 fetch('{% url "update-quantity" %}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': '{{ csrf_token }}',  // Include CSRF token in headers
+                        'X-CSRFToken': '{{ csrf_token }}',
                     },
                     body: JSON.stringify({ sku: sku, quantity: newQuantity }),
                 })

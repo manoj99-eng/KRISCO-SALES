@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import WeeklyOffersView, AddToPreviewView, update_quantity_view, SubmitPreviewView, ThankYouView
+from .views import *
 
 urlpatterns = [
     path('weekly-offers/', WeeklyOffersView.as_view(), name='weekly-offers'),
@@ -7,4 +7,6 @@ urlpatterns = [
     path('update-quantity/', update_quantity_view, name='update-quantity'),
     path('submit-preview/', SubmitPreviewView.as_view(), name='submit-preview'),  # Add this line
     path('thank-you/', ThankYouView.as_view(), name='thank-you'),
+
+
 ]
