@@ -4,11 +4,18 @@
 {% block content %}
     <div class="module">
         <h2>Import CSV</h2>
+        {% if messages %}
+            <ul class="messagelist">
+                {% for message in messages %}
+                    <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
         <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
             <label for="csv_file">Choose CSV file:</label>
             <input type="file" name="csv_file" accept=".csv">
-            <input type="submit" value="Import">
+            <input type="submit" value="Import" class="default">
         </form>
     </div>
 {% endblock %}

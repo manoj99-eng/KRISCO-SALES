@@ -1,0 +1,23 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block branding %}
+<h1 id="site-name">
+    <a href="{% url 'admin:index' %}">KRISCO ADMINSTRATION PANEL</a>
+</h1>
+{% endblock %}
+
+
+{% block extrahead %}
+    {{ block.super }}
+    <!-- Bootstrap CSS CDN Link -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/5.1.0/css/bootstrap.min.css" integrity="sha384-KyZXEAg3QhqLMpG8r+Knujsl5/z0I5t9z5lFf5r5l5u5z5F5w5f5Oj04meM1a7xj" crossorigin="anonymous">
+    <!-- Bootstrap Bundle with Popper.js CDN Link -->
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/5.1.0/js/bootstrap.bundle.min.js" integrity="sha384-1CmRX2rFp7y9EAe1hYxGpI9jSg+6g/oQyRfM5i0z0t6Cu5+QfUJoqGyw1lN3e3F7" crossorigin="anonymous"></script>
+{% endblock %}
+
+
+{% block extrastyle %}
+    {{ block.super }}
+    <!-- Additional styles here if necessary -->
+{% endblock %}
