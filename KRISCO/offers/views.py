@@ -84,7 +84,7 @@ class SubmitPreviewView(View):
             dataframe = pd.DataFrame(data['previewData'])
 
             # Generate a unique order ID using the current timestamp
-            order_id = f'ORDER-{timezone.now().strftime("%Y%m%d%H%M%S")}'
+            order_id = f'ORDER-ID :- {timezone.now().strftime("%Y%m%d%H%M%S")}'
 
             # Convert DataFrame to a dictionary for JSON storage
             order_data_json = dataframe.to_dict(orient='records')
@@ -126,15 +126,14 @@ class SubmitPreviewView(View):
             workbook.save(excel_buffer)
             excel_buffer.seek(0)
 
-            subject = f'New Order Received: Order-ID : {order_id}'
+            subject = f'New Order Received: {order_id}'
             message = 'Please find the attached Excel file containing the order details.'
             from_email = settings.EMAIL_HOST_USER
-            recipient_list = [request.user.email]
             cc_email = 'support10@pbkriscosales.net'
             recipient_list_with_cc = [request.user.email, cc_email]
 
             email = EmailMessage(subject, message, from_email, recipient_list_with_cc)
-            email.attach('preview_data.xlsx', excel_buffer.read(), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            email.attach('preview_order.xlsx', excel_buffer.read(), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             email.send()
 
             excel_buffer.close()

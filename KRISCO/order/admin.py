@@ -2,17 +2,21 @@ from urllib import request
 from django.contrib import admin, messages
 from django.shortcuts import render
 from django.http import HttpResponse
+from django.urls import reverse
 import pandas as pd
 from .models import *
 from offers.models import Weekly_Offer
 import json
 from django.utils.html import format_html
+from django.contrib import messages
+
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ('order_id', 'customer_email', 'customer_firstname', 'customer_lastname', 'is_approved')
+    list_display = ('order_id', 'customer_email', 'customer_firstname', 'customer_lastname', 'is_approved', 'notes',)
     readonly_fields = ('order_id', 'order_data_pretty', 'customer_email', 'customer_firstname', 'customer_lastname',)
     exclude = ('order_data',)
+    search_fields = ['order_id', 'customer_email', 'customer_firstname', 'customer_lastname']
 
     actions = ['approve_orders']
 
@@ -82,28 +86,52 @@ class OrderAdmin(admin.ModelAdmin):
         if is_approving or is_unapproving:
             self.update_weekly_offer_quantities(obj, subtract=is_approving)
 
-    def update_weekly_offer_quantities(self, order, subtract):
-        # Directly work with the order data as it's already a Python object (list or dict)
-        for item in order.order_data:
-            sku = item.get('sku')
-            quantity = item.get('entered_quantity')
-            try:
+    from django.contrib import messages
+
+    def update_weekly_offer_quantities(self, request, order, subtract):
+        try:
+            for item in order.order_data:
+                sku = item.get('sku')
+                quantity = item.get('entered_quantity')
                 weekly_offer = Weekly_Offer.objects.get(sku=sku)
                 if subtract:
                     if weekly_offer.available_qty >= quantity:
                         weekly_offer.available_qty -= quantity
+                        weekly_offer.save()
                     else:
-                        raise ValueError(f"Not enough quantity for SKU {sku}.")
+                        messages.error(request, f"Not enough quantity for SKU {sku}.", extra_tags='danger')
+                        break  # Break out of the loop on error, no further processing
                 else:
                     weekly_offer.available_qty += quantity
-                weekly_offer.save()
-            except Weekly_Offer.DoesNotExist:
-                raise ValueError(f"Weekly offer with SKU {sku} does not exist.")
-            except ValueError as e:
-                # If there's a problem, revert changes
-                admin.ModelAdmin.message_user(self, request, str(e), level=messages.ERROR)
-                order.is_approved = not subtract
-                order.save(update_fields=['is_approved'])
-                break  # Exit the loop on error
+                    weekly_offer.save()
+            else:
+                # No errors occurred, approve the order and redirect
+                order.is_approved = True
+                order.save()
+                messages.success(request, "Order has been successfully approved and quantities updated.", extra_tags='success')
+                return True  # Returning True to indicate success
+        except Weekly_Offer.DoesNotExist:
+            messages.error(request, f"Weekly offer with SKU {sku} does not exist.", extra_tags='danger')
+        except Exception as e:
+            messages.error(request, f"An error occurred: {str(e)}", extra_tags='danger')
+
+        # Returning False to indicate error
+        return False
+
+    def save_model(self, request, obj, form, change):
+        if 'is_approved' in form.changed_data:
+            # Determine if we are approving or unapproving
+            is_approving = obj.is_approved
+            if is_approving:
+                success = self.update_weekly_offer_quantities(request, obj, subtract=is_approving)
+                if not success:
+                    # If there was an error, keep the is_approved status unchanged
+                    obj.is_approved = not is_approving
+            else:
+                # For unapproving, simply reverse the quantities
+                self.update_weekly_offer_quantities(request, obj, subtract=is_approving)
+
+        super().save_model(request, obj, form, change)
+
 
     approve_orders.short_description = 'Approve selected orders'
