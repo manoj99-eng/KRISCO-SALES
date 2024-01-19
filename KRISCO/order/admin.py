@@ -65,12 +65,22 @@ class OrderAdmin(admin.ModelAdmin):
     order_data_pretty.short_description = "Order Data"
 
     def approve_orders(self, request, queryset):
+        # Process each order in the queryset
         for order in queryset:
-            self.update_weekly_offer_quantities(request, order, subtract=True)
-            order.is_approved = True
-            order.save()
-        messages.success(request, "Selected orders have been approved and quantities updated.")
+            # Call update method and check if it's successful
+            success = self.update_weekly_offer_quantities(request, order, subtract=True)
+
+            if success:
+                # If successful, mark the order as approved and save
+                order.is_approved = True
+                order.save()
+                messages.success(request, f"Order {order.order_id} has been successfully approved.")
+            else:
+                # If not successful, do not approve and notify the admin
+                messages.error(request, f"Order {order.order_id} could not be approved due to insufficient quantities.", extra_tags='danger')
+
     approve_orders.short_description = 'Approve selected orders'
+
 
     def save_model(self, request, obj, form, change):
         # Save the object first
@@ -94,25 +104,27 @@ class OrderAdmin(admin.ModelAdmin):
 
 
     def update_weekly_offer_quantities(self, request, order, subtract):
-            try:
-                for item in order.order_data:
-                    sku = item.get('sku')
-                    quantity = item.get('entered_quantity')
-                    weekly_offer = Weekly_Offer.objects.get(sku=sku)
-                    if subtract:
-                        if weekly_offer.available_qty >= quantity:
-                            weekly_offer.available_qty -= quantity
-                        else:
-                            messages.error(request, f"Not enough quantity for SKU {sku}.", extra_tags='danger')
-                            return False
+        try:
+            for item in order.order_data:
+                sku = item.get('sku')
+                quantity = item.get('entered_quantity')
+                weekly_offer = Weekly_Offer.objects.get(sku=sku)
+
+                if subtract:
+                    if weekly_offer.available_qty >= quantity:
+                        weekly_offer.available_qty -= quantity
                     else:
-                        weekly_offer.available_qty += quantity
-                    weekly_offer.save()
-                return True
-            except Weekly_Offer.DoesNotExist:
-                messages.error(request, f"Weekly offer with SKU {sku} does not exist.", extra_tags='danger')
-                return False
-            except Exception as e:
-                messages.error(request, f"An error occurred: {str(e)}", extra_tags='danger')
-                return False
+                        messages.error(request, f"Not enough quantity for SKU {sku}.", extra_tags='danger')
+                        return False  # Return False to indicate failure
+                else:
+                    weekly_offer.available_qty += quantity
+
+                weekly_offer.save()
+            return True  # Return True to indicate success
+        except Weekly_Offer.DoesNotExist:
+            messages.error(request, f"Weekly offer with SKU {sku} does not exist.", extra_tags='danger')
+            return False
+        except Exception as e:
+            messages.error(request, f"An error occurred: {str(e)}", extra_tags='danger')
+            return False
 
