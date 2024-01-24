@@ -2,303 +2,251 @@
 {% load custom_filters %}
 
 {% block content %}
-    <main>
-        <center><h1>CUSTOM ORDERS</h1></center>
-        <br>
-        <div class="container">
-            <form id="offers-form" method="get" action="{% url 'weekly-offers' %}">
-                <label for="brand">Brand:</label>
-                <select name="brand">
-                    <option value="" selected>All Brands</option>
-                    {% for brand in unique_brands %}
-                        <option value="{{ brand }}">{{ brand }}</option>
-                    {% endfor %}
-                </select>
-                <label for="category">Category:</label>
-                <select name="category">
-                    <option value="" selected>All Categories</option>
-                    {% for category in unique_categories %}
-                        <option value="{{ category }}">{{ category }}</option>
-                    {% endfor %}
-                </select>
-                <button type="submit" class="btn btn-primary">Filter</button>
-            </form>
-        </div>
-        <br>
-        <div class="container">
-            <table class="table table-striped table-bordered border-primary table-hover" id="items-table">
-                <thead>
-                    <tr>
-                        <th>SKU</th>
-                        <th>UPC</th>
-                        <th>DESCRIPTION</th>
-                        <th>AVAILABLE</th>
-                        <th>MSRP</th>
-                        <th>DISCOUNT</th>
-                        <th>OFFER</th>
-                        <th>REQUIRED</th>
-                        <th>ACTION</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in items %}
+<main>
+    <center><h1>CUSTOM ORDERS</h1></center>
+    <br>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar for filters -->
+            <div class="col-md-2">
+                <div class="filters-sidebar">
+                    <h3>Filters</h3>
+                    <form id="offers-form" method="get" action="{% url 'weekly-offers' %}">
+                        <div class="mb-3">
+                            <label for="brand" class="form-label">Brand:</label>
+                            <select name="brand" class="form-select">
+                                <option value="" selected>All Brands</option>
+                                {% for brand in unique_brands %}
+                                    <option value="{{ brand }}">{{ brand }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="category" class="form-label">Category:</label>
+                            <select name="category" class="form-select">
+                                <option value="" selected>All Categories</option>
+                                {% for category in unique_categories %}
+                                    <option value="{{ category }}">{{ category }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Apply Filters</button>
+                    </form>
+                    <!-- Pagination Controls -->
+                        <div class="mt-4 d-flex justify-content-center">
+                            <nav aria-label="Page navigation">
+                                <ul class="pagination">
+                                    <li class="page-item">
+                                        <button id="prev-page-btn" class="page-link" aria-label="Previous" onclick="changePage('prev')">
+                                            <span aria-hidden="true">&laquo;</span>
+                                        </button>
+                                    </li>
+                                    <li class="page-item">
+                                        <span class="page-link" id="page-info"></span>
+                                    </li>
+                                    <li class="page-item">
+                                        <button id="next-page-btn" class="page-link" aria-label="Next" onclick="changePage('next')">
+                                            <span aria-hidden="true">&raquo;</span>
+                                        </button>
+                                    </li>
+                                </ul>
+                            </nav>
+                        </div>
+                </div>
+            </div>
+            <!-- Main content -->
+            <div class="col-md-10">
+                <table class="table table-striped table-bordered border-primary table-hover" id="items-table">
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>UPC</th>
+                            <th>DESCRIPTION</th>
+                            <th>AVAILABLE</th>
+                            <th>MSRP</th>
+                            <th>DISCOUNT</th>
+                            <th>OFFER</th>
+                            <th>REQUIRED</th>
+                            <th>ACTION</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
                         <tr data-sku="{{ item.sku }}">
                             <td>{{ item.sku }}</td>
-                            <td>{{ item.upc }}</td>
-                            <td>{{ item.description }}</td>
+                            <td class="upc">{{ item.upc }}</td>
+                            <td class="description">{{ item.description }}</td>
                             <td class="available-qty">{{ item.available_qty }}</td>
                             <td>{{ item.msrp }}</td>
                             <td>{{ item.discount }}</td>
-                            <td>{{ item.offer_price }}</td>
+                            <td class="offer-price">{{ item.offer_price }}</td>
                             <td>
-                                <input type="number" name="quantity" required class="form-control">
+                                <input type="number" name="quantity" required class="form-control quantity-input">
                             </td>
                             <td><button type="button" class="add-btn btn btn-primary">Add</button></td>
                         </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <center><h1>REVIEW AND SUBMIT YOUR ORDER</h1></center>
-        <div class="container">
-            {% if messages %}
-                <div class="alert alert-info" role="alert">
-                {% for message in messages %}
-                        {{ message }}
-                {% endfor %}
-                </div>
-            {% endif %}
-        </div>
-        
-        <br>
-        <div class="container">
-            <table class="table table-striped table-bordered border-primary table-hover" id="preview-table">
-                <thead>
-                    <tr>
-                        <th>SKU</th>
-                        <th>UPC</th>
-                        <th>DESCRIPTION</th>
-                        <th>ENTERED QUANTITY</th>
-                        <th>OFFERED PRICE</th>
-                        <th>ACTION</th>
-                    </tr>
-                </thead>
-                <tbody id="preview-body">
-                    {% for index, row in temporary_dataframe.iterrows %}
-                        <tr>
-                            <td>{{ row.sku }}</td>
-                            <td>{{ sku_info|get_item:row.sku|get_item:"upc" }}</td>
-                            <td>{{ row.description }}</td>
-                            <td>{{ row.entered_quantity }}</td>
-                            <td class="offered-price">{{ sku_info|get_item:row.sku|get_item:"offered_price" }}</td>
-                            <td>
-                                <button type="button" class="remove-btn" data-sku="{{ row.sku }}">Remove</button>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-                <tfoot id="grand-total-row">
-                    <tr>
-                        <td colspan="1">GRAND TOTAL </td>
-                        <td></td>
-                        <td></td>
-                        <td id="total-quantity">0 </td>
-                        <td id="total-price">0.00 &nbsp;$</td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
-        <div class="container">
-            <div class="d-grid gap-2">
-                <button class="btn btn-primary" id="submit-btn" type="button">SUBMIT</button>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
-    </main>
+    </div>
+    <br>
+    <!-- Off-canvas Cart -->
+    <div class="offcanvas offcanvas-end" style="width: 90%;" tabindex="-1" id="cartOffcanvas" aria-labelledby="cartOffcanvasLabel">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="cartOffcanvasLabel">Your Cart</h5>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <table class="table" id="cart-items-table">
+                <thead class="table-dark">
+                    <tr>
+                        <th scope="col">SKU</th>
+                        <th scope="col">UPC</th>
+                        <th scope="col">Description</th>
+                        <th scope="col">Quantity</th>
+                        <th scope="col">Price</th>
+                        <th scope="col">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="cart-items-container">
+                    <!-- Items will be added here using JavaScript -->
+                </tbody>
+            </table>
+            <div class="d-grid gap-2">
+                <button id="submit-cart-btn" class="btn btn-success btn-lg">Submit Cart</button>
+            </div>
+        </div>
+    </div>
 
-    <!-- JavaScript Section -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const submitBtn = document.getElementById('submit-btn');
-            const previewBody = document.getElementById('preview-body');
-            const grandTotalRow = document.getElementById('grand-total-row');
-            const totalQuantityElement = document.getElementById('total-quantity');
-            const totalPriceElement = document.getElementById('total-price');
+    <!-- Include Bootstrap JS (make sure it's loaded after jQuery, if jQuery is used) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>   
+</main>       
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Variables to manage cart and pagination
+        let cart = JSON.parse(localStorage.getItem('cart')) || [];
+        const itemsTable = document.getElementById('items-table');
+        const itemsPerPage = 6;
+        let currentPage = 1;
+    
+        function paginateItems() {
+            const rows = itemsTable.querySelectorAll('tbody tr');
+            const pageStart = (currentPage - 1) * itemsPerPage;
+            const pageEnd = pageStart + itemsPerPage;
 
-            // Add event listener for Remove buttons
-            previewBody.addEventListener('click', function (event) {
-                if (event.target.classList.contains('remove-btn')) {
-                    const row = event.target.closest('tr');
-                    const sku = row.querySelector('td:nth-child(1)').innerText;
-                    const enteredQuantity = parseInt(row.querySelector('td:nth-child(4)').innerText, 10);
-                    const offeredPrice = parseFloat(row.querySelector('td.offered-price').innerText);
-
-                    // Remove the row from the preview table
-                    row.remove();
-
-                    // Update available quantity in the original items table
-                    const originalRow = document.querySelector(`#items-table tr[data-sku="${sku}"]`);
-                    const availableQtyCell = originalRow.querySelector('.available-qty');
-                    const currentAvailableQuantity = parseInt(availableQtyCell.innerText, 10);
-                    availableQtyCell.innerText = currentAvailableQuantity + enteredQuantity;
-
-                    // Update the quantity in the database
-                    updateQuantityInDatabase(sku, currentAvailableQuantity + enteredQuantity);
-
-                    // Update the Grand Total row
-                    updateGrandTotal(-enteredQuantity, -offeredPrice);
-                }
+            rows.forEach((row, index) => {
+                row.style.display = index >= pageStart && index < pageEnd ? '' : 'none';
             });
 
-            // This section is responsible for adding items to the preview table
-            document.querySelectorAll('#items-table .add-btn').forEach(function (addBtn) {
-                addBtn.addEventListener('click', function () {
-                    const row = addBtn.closest('tr');
-                    const sku = row.querySelector('td:nth-child(1)').innerText;
-                    const upc = row.querySelector('td:nth-child(2)').innerText;
-                    const description = row.querySelector('td:nth-child(3)').innerText;
-                    const availableQty = parseInt(row.querySelector('td:nth-child(4)').innerText, 10);
-                    const msrp = parseFloat(row.querySelector('td:nth-child(5)').innerText);
-                    const discount = parseFloat(row.querySelector('td:nth-child(6)').innerText);
-                    const offerPrice = parseFloat(row.querySelector('td:nth-child(7)').innerText);
-                    const requiredQuantityInput = row.querySelector('input[name="quantity"]');
-                    const requiredQuantity = parseInt(requiredQuantityInput.value, 10);
+            document.getElementById('page-info').textContent = `Page ${currentPage} of ${Math.ceil(totalItems / itemsPerPage)}`;
+        }
+    
+        function changePage(direction) {
+            const totalItems = itemsTable.querySelectorAll('tbody tr').length;
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            if (direction === 'next' && currentPage < totalPages) {
+                currentPage++;
+            } else if (direction === 'prev' && currentPage > 1) {
+                currentPage--;
+            }
+            paginateItems();
+        }
 
-                    // Check if the required quantity is valid
-                    if (requiredQuantity > 0 && requiredQuantity <= availableQty) {
-                        // Calculate offered price for the entered quantity
-                        const offeredPriceForQuantity = offerPrice * requiredQuantity;
-
-                        // Add the row to the preview table
-                        const previewRow = document.createElement('tr');
-                        previewRow.innerHTML = `
-                            <td>${sku}</td>
-                            <td>${upc}</td>
-                            <td>${description}</td>
-                            <td>${requiredQuantity}</td>
-                            <td class="offered-price">${offeredPriceForQuantity.toFixed(2)}</td>
-                            <td>
-                                <button type="button" class="remove-btn" data-sku="${sku}">Remove</button>
-                            </td>
-                        `;
-                        previewBody.appendChild(previewRow);
-
-                        // Update available quantity in the original items table
-                        const originalRow = document.querySelector(`#items-table tr[data-sku="${sku}"]`);
-                        const availableQtyCell = originalRow.querySelector('.available-qty');
-                        availableQtyCell.innerText = availableQty - requiredQuantity;
-
-                        // Update the quantity in the database
-                        updateQuantityInDatabase(sku, availableQty - requiredQuantity);
-
-                        // Update the Grand Total row
-                        updateGrandTotal(requiredQuantity, offeredPriceForQuantity);
-                    } else {
-                        // Handle invalid quantity (show an error message, etc.)
-                        alert('Invalid quantity. Please enter a valid quantity.');
-                    }
-                });
+        // Expose changePage to the global scope
+        window.changePage = changePage;
+    
+        // Function to update the cart display
+        function updateCartDisplay() {
+            const cartItemsContainer = document.getElementById('cart-items-container');
+            cartItemsContainer.innerHTML = ''; // Clear the cart display
+    
+            cart.forEach((item, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.sku}</td>
+                    <td>${item.upc}</td>
+                    <td>${item.description}</td>
+                    <td>${item.quantity}</td>
+                    <td>$${(item.offeredPrice * item.quantity).toFixed(2)}</td>
+                    <td><button class="btn btn-danger btn-sm" onclick="removeFromCart(${index})">Remove</button></td>
+                `;
+                cartItemsContainer.appendChild(row);
             });
-
-            // Add event listener for Submit button
-            submitBtn.addEventListener('click', function () {
-                // Collect data from the preview table
-                const previewData = [];
-                document.querySelectorAll('#preview-table tbody tr').forEach(function (row) {
-                    previewData.push({
-                        sku: row.querySelector('td:nth-child(1)').innerText,
-                        upc: row.querySelector('td:nth-child(2)').innerText,
-                        description: row.querySelector('td:nth-child(3)').innerText,
-                        entered_quantity: parseInt(row.querySelector('td:nth-child(4)').innerText, 10),
-                        offered_price: parseFloat(row.querySelector('td.offered-price').innerText),
-                    });
-                });
-
-                // Check if previewData is not empty before sending
-                if (previewData.length > 0) {
-                    // Log the data before sending
-                    console.log('Preview Data:', previewData);
-
-                    // Send the data to the server
-                    fetch('{% url "submit-preview" %}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': '{{ csrf_token }}',  // Include CSRF token in headers
-                        },
-                        body: JSON.stringify({ previewData: previewData }),
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            console.log('Preview submitted successfully.');
-                            console.log('DataFrame:', data.dataframe);
-                            // Redirect to the thankyou.html page
-                            window.location.href = '{% url "thank-you" %}';
-                        } else {
-                            console.error('Failed to submit preview.');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error while submitting preview:', error);
-                    });
+        }
+    
+        // Function to add items to the cart
+        function addToCart(sku, upc, description, quantity, offeredPrice) {
+            const existingItem = cart.find(item => item.sku === sku);
+            if (existingItem) {
+                existingItem.quantity += quantity;
+            } else {
+                cart.push({ sku, upc, description, quantity, offeredPrice });
+            }
+            localStorage.setItem('cart', JSON.stringify(cart)); // Save cart to localStorage
+            updateAvailableQty(sku, -quantity); // Update available quantity on the page
+            updateCartDisplay(); // Update the cart display
+        }
+    
+        // Function to remove items from the cart
+        window.removeFromCart = function(index) {
+            const item = cart[index];
+            updateAvailableQty(item.sku, item.quantity); // Restore the available quantity
+            cart.splice(index, 1); // Remove the item from the cart
+            localStorage.setItem('cart', JSON.stringify(cart)); // Save the updated cart
+            updateCartDisplay(); // Update the cart display
+        };
+    
+        // Function to update the available quantity on the page
+        function updateAvailableQty(sku, change) {
+            const itemRow = itemsTable.querySelector(`tr[data-sku="${sku}"]`);
+            const qtyCell = itemRow.querySelector('.available-qty');
+            const currentAvailableQty = parseInt(qtyCell.textContent);
+            qtyCell.textContent = currentAvailableQty + change;
+        }
+    
+        // Event listeners for add-to-cart buttons
+        document.querySelectorAll('.add-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                const row = button.closest('tr');
+                const sku = row.dataset.sku;
+                const upc = row.querySelector('.upc').textContent;
+                const description = row.querySelector('.description').textContent;
+                const quantityInput = row.querySelector('.quantity-input');
+                const quantity = parseInt(quantityInput.value, 10);
+                const offeredPrice = parseFloat(row.querySelector('.offer-price').textContent);
+    
+                if (quantity > 0 && quantity <= parseInt(row.querySelector('.available-qty').textContent)) {
+                    addToCart(sku, upc, description, quantity, offeredPrice);
+                    quantityInput.value = ''; // Reset the input field after adding to cart
                 } else {
-                    console.error('Preview data is empty. Please add items to submit.');
+                    alert('Invalid quantity.'); // Alert if the quantity is not valid
                 }
             });
-
-            // Function to update quantity in the database
-            function updateQuantityInDatabase(sku, newQuantity) {
-                // Before the fetch request to update quantity in the database
-                console.log('Updating quantity for SKU:', sku, 'to new quantity:', newQuantity);
-
-                // Check for NaN values and handle them
-                if (isNaN(newQuantity)) {
-                    console.error('Invalid new quantity. Skipping update.');
-                    return;
-                }
-
-                // Make an asynchronous request to update the quantity in the database
-                fetch('{% url "update-quantity" %}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': '{{ csrf_token }}',
-                    },
-                    body: JSON.stringify({ sku: sku, quantity: newQuantity }),
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Failed to update quantity for SKU ${sku}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if (data.success) {
-                        console.log('Quantity updated in the database.');
-                    } else {
-                        console.error('Failed to update quantity in the database.');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error while updating quantity in the database:', error);
-                });
-            }
-
-            // Function to update the Grand Total row
-            function updateGrandTotal(enteredQuantity, offeredPrice) {
-                // Get the current total quantity and total price
-                let currentTotalQuantity = parseInt(totalQuantityElement.innerText, 10);
-                let currentTotalPrice = parseFloat(totalPriceElement.innerText);
-
-                // Update the total quantity and total price
-                currentTotalQuantity += enteredQuantity;
-                currentTotalPrice += offeredPrice;
-
-                // Update the Grand Total row
-                totalQuantityElement.innerText = currentTotalQuantity;
-                totalPriceElement.innerText = currentTotalPrice.toFixed(2);
-            }
         });
-    </script>
+    
+        // Event listener for the submit cart button
+        document.getElementById('submit-cart-btn').addEventListener('click', function() {
+            if (cart.length === 0) {
+                alert('Your cart is empty.'); // Alert if the cart is empty
+                return;
+            }
+            // Logic to submit the cart
+            // For example, you could send the cart data to the server here
+            // ...
+    
+            localStorage.removeItem('cart'); // Clear the cart from localStorage after submission
+            cart = []; // Clear the cart array
+            updateCartDisplay(); // Update the cart display
+            alert('Cart submitted successfully.'); // Alert on successful submission
+            // Redirect to thank you page or perform another action here
+            // ...
+        });
+    
+        // Initial display setup
+        paginateItems(); // Paginate items for the first load
+        updateCartDisplay(); // Update cart display for the first load
+    });
+    </script>    
 {% endblock %}
