@@ -2,9 +2,11 @@ from django.urls import path
 from .views import *
 from django.conf.urls.static import static
 from django.conf import settings
+from django.contrib import admin
 
 
 urlpatterns = [
+    path('admin/', admin.site.urls),
     path('weekly-offers/', WeeklyOffersView.as_view(), name='weekly-offers'),
     path('weekly-offers/add-to-preview/', AddToPreviewView.as_view(), name='add-to-preview'),
     path('update-quantity/', update_quantity_view, name='update-quantity'),

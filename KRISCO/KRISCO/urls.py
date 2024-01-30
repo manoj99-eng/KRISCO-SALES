@@ -20,7 +20,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('',include('home.urls')),
     path('accounts/',include('accounts.urls')),
-    path('offers/',include('offers.urls')),
+    path('offers/',include(('offers.urls','offers'), namespace='offer')),
     path('staff/',include('staff.urls')),
     path('order/', include(('order.urls', 'order'), namespace='order')),  # Include with namespace
     path('customer/',include('customer.urls')),

@@ -1,0 +1,33 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div id="content-main">
+    <h1>Filtered Data</h1>
+    <div class="table-responsive">
+        <table class="table table-primary">
+            <thead>
+                <tr>
+                    <th scope="col">SKU</th>
+                    <th scope="col">Description</th>
+                    <th scope="col">Available</th>
+                    <th scope="col">Cost</th>
+                    <th scope="col">Seller Category</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in filtered_data %}
+                <tr class="">
+                    <td>{{ item.sku }}</td>
+                    <td>{{ item.description }}</td>
+                    <td>{{item.available}}</td>
+                    <td>{{item.cost}}</td>
+                    <td>{{item.sellercategory}}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <button><a href="{% url 'admin:offer_discount' %}">Confrim Selection</a></button>
+</div>
+
+{% endblock %}

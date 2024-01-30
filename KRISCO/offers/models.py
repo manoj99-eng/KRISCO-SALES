@@ -35,3 +35,20 @@ class Weekly_Offer(models.Model):
         if not self.offer_price:
             self.offer_price = self.msrp - (self.msrp * (self.discount / Decimal('100.00')))
         super().save(*args, **kwargs)
+
+
+class BrandOffer(models.Model):
+    sku = models.CharField(max_length=200, unique=True)
+    upc = models.CharField(max_length=200)
+    description = models.CharField(max_length=500)
+    available = models.IntegerField()
+    cost = models.DecimalField(max_digits=10, decimal_places=2)
+    discount = models.DecimalField(max_digits=5, decimal_places=2)
+    offer_price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"{self.sku} - {self.description}"
+
+    class Meta:
+        verbose_name = 'Brand Offer'
+        verbose_name_plural = 'Brand Offers'

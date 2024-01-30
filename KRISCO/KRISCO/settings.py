@@ -41,10 +41,14 @@ INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
+    'daterange.apps.DateRangeFilterConfig',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'crispy_forms',
 ]
+
+CRISPY_TEMPLATE_PACK = 'bootstrap4' 
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -142,3 +146,7 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'mrbitbyte99@gmail.com'
 EMAIL_HOST_PASSWORD = 'xkqaqragpyckoagp'
+
+
+
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 20000000  # Increase the limit to a suitable value

@@ -1,0 +1,15 @@
+{% extends "admin/base_site.html" %}  <!-- Use the appropriate admin base template -->
+{% load static %}
+{% load i18n %}
+
+
+{% block content %}
+
+<form id="edit_discount_form" data-item-id="{{ item_id }}">
+    {% csrf_token %}
+    <label for="new_discount">New Discount:</label>
+    <input type="text" id="new_discount" name="new_discount" required>
+    <button type="submit">Save</button>
+</form>
+
+{% endblock %}

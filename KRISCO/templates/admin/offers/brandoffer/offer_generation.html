@@ -1,0 +1,91 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrahead %}
+<style>
+/* Style for form labels */
+label {
+    font-weight: bold;
+}
+
+/* Style for form input fields */
+input[type="text"],
+select {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+/* Style for multi-select dropdowns */
+select[multiple] {
+    height: auto;
+}
+
+/* Make the button block-level */
+button[type="submit"] {
+    display: block;
+    width: 100%;
+    background-color: #84ADC5;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 10px 20px;
+    cursor: pointer;
+}
+
+
+/* Hover effect for the button */
+button[type="submit"]:hover {
+    background-color: #4E758D;
+}
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <h1>Offer Generation Process</h1>
+    <form method="post" action="{% url 'admin:filter_offers' %}">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="sellercategory">Seller Category:</label>
+            <select name="sellercategory" id="sellercategory" class="form-control" multiple>
+                {% for sellercategory in unique_sellercategories %}
+                    <option value="{{ sellercategory }}">{{ sellercategory }}</option>
+                {% endfor %}
+            </select>
+        </div>           
+        <div class="form-group">
+            <label for="brand">Brand:</label>
+            <select name="brand" id="brand" class="form-control" multiple>
+                {% for brand in unique_brands %}
+                    <option value="{{ brand }}"
+                            {% if brand in selected_filters.brand %} selected{% endif %}>
+                        {{ brand }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>                      
+        <button type="submit" class="btn btn-primary">Apply Filter</button>
+    </form>
+</div>
+
+
+<script>
+    // Function to store selected filters in session storage
+    function storeSelectedFilters() {
+      const description = document.getElementById('description').value;
+      const sellercategory = Array.from(document.querySelectorAll('#sellercategory option:checked')).map(option => option.value);
+      const brand = Array.from(document.querySelectorAll('#brand option:checked')).map(option => option.value);
+  
+      sessionStorage.setItem('selectedFilters', JSON.stringify({ description, sellercategory, brand }));
+    }
+  
+    // Add an event listener to the form submit button
+    document.querySelector('form').addEventListener('submit', storeSelectedFilters);
+  </script>
+  
+{% endblock %}

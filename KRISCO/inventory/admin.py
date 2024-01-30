@@ -1,13 +1,20 @@
-from django.urls import path
+from django.utils import timezone
+from django.urls import path, reverse
 from django.contrib import admin
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.http import HttpResponse, HttpResponseRedirect
 from django.db import transaction
-from .models import Item,Stock,InOutReport
+import pandas as pd
+from .models import Item,Stock,InOutReport,SlowMoversReport
 import csv
+from decimal import Decimal, InvalidOperation
 import io
 import logging
 from django.contrib import messages
+from decimal import Decimal, InvalidOperation
+from daterange.filters import DateRangeFilter
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +200,7 @@ class InOutReportAdmin(admin.ModelAdmin):
         ]
         return custom_urls + urls
 
+
     def import_txt(self, request):
         if request.method == 'POST':
             txt_file = request.FILES.get('txt_file')
@@ -255,9 +263,104 @@ class InOutReportAdmin(admin.ModelAdmin):
         context = {'title': 'Import TXT for In & Out Report'}
         return render(request, 'admin/import_txt.html', context)
 
+# Setup logger
+logger = logging.getLogger(__name__)
+
+def safe_decimal_conversion(value, default=Decimal(0)):
+    try:
+        return Decimal(str(value))
+    except InvalidOperation:
+        logger.error(f"Decimal conversion error for value: {value}")
+        return default
+
+@admin.register(SlowMoversReport)
+class SlowMoversReportAdmin(admin.ModelAdmin):
+    list_display = ['sku', 'upc', 'brand','item_classification', 'description', 'qtyin_oneyear', 'qtyout_oneyear', 'balance_oneyear', 'available', 'cost', 'sellercategory']
+    list_filter = (('report_date', DateRangeFilter),'sellercategory','item_classification','brand')
+    search_fields = ['sku', 'upc', 'item_classification', 'description', 'qtyin_oneyear', 'qtyout_oneyear', 'balance_oneyear', 'available', 'cost', 'sellercategory']
+    actions = ['generate_slow_movers_report']
 
     
+    def generate_slow_movers_report(self, request, queryset):
+        # Fetch data from Stock and InOutReport models
+        stock_data = Stock.objects.all().values()
+        in_out_data = InOutReport.objects.all().values()
 
+        # Convert to pandas DataFrame
+        df_stock = pd.DataFrame(stock_data)
+        df_in_out = pd.DataFrame(in_out_data)
+
+        # Clean and process the DataFrame
+        df_stock['available'] = df_stock['available'].fillna(0)
+        df_stock['allocated'] = df_stock['allocated'].fillna(0)
+        df_stock['item_classification'] = df_stock['item_classification'].fillna('UNKNOWN')
+
+        # Remove specific suffixes from SKU
+        suffixes_to_remove = ['-D', '-NZ', '-HK', '-SING', '-R', '-X', '-NL','-NC','NOBOX', '-NO BOX', '-TESTER', '-SAMPLE', '-SAMPLES', '-SAMPLER', '-SAMPLE KIT']
+        for suffix in suffixes_to_remove:
+            df_stock = df_stock[~df_stock['sku'].str.endswith(suffix, na=False)]
+
+        # Prepare the final DataFrame
+        df_final = df_stock[['sku', 'upc', 'item_classification', 'description', 'available', 'cost']].copy()
+        df_final['qtyin_oneyear'] = df_final['sku'].map(df_in_out.groupby('sku')['qty_in'].sum())
+        df_final['qtyout_oneyear'] = df_final['sku'].map(df_in_out.groupby('sku')['qty_out'].sum())
+        df_final['balance_oneyear'] = df_final['sku'].map(df_in_out.groupby('sku')['balance'].sum())
+
+        # Calculate additional fields
+        df_final['begining_balance'] = df_final['balance_oneyear'] - df_final['qtyin_oneyear'] + df_final['qtyout_oneyear']
+        df_final['reference'] = df_final['qtyin_oneyear'] + df_final['balance_oneyear']
+        df_final['percentage'] = df_final.apply(lambda x: safe_decimal_conversion((x['qtyout_oneyear'] / x['reference']) * 100 if x['reference'] else 0), axis=1)
+
+        # Assign SellerCategory based on conditions
+        df_final['sellercategory'] = 'Dead Seller'  # Default value
+        df_final.loc[(df_final['percentage'] > 20) & (df_final['percentage'] < 80), 'sellercategory'] = 'Average Seller'
+        df_final.loc[df_final['percentage'] > 80, 'sellercategory'] = 'Best Seller'
+        df_final.loc[df_final['percentage'] < 20, 'sellercategory'] = 'Slow Seller'
+
+        # Save to SlowMoversReport model
+        for _, row in df_final.iterrows():
+            try:
+                item = Item.objects.get(sku=row['sku'])
+                brand = item.brand if item else None
+                if not brand:
+                    # If Item not found, extract brand from the description
+                    description_parts = row['description'].split('-')
+                    if len(description_parts) >= 2:
+                        brand = description_parts[0].strip()
+                    else:
+                        brand = 'UNKNOWN'
+                SlowMoversReport.objects.update_or_create(
+                    report_date=timezone.now(),
+                    sku=row['sku'],
+                    defaults={
+                        'upc': row['upc'],
+                        'item_classification': row['item_classification'],
+                        'description': row['description'],
+                        'qtyin_oneyear': int(row['qtyin_oneyear']) if row['qtyin_oneyear'] else 0,
+                        'qtyout_oneyear': int(row['qtyout_oneyear']) if row['qtyout_oneyear'] else 0,
+                        'balance_oneyear': int(row['balance_oneyear']) if row['balance_oneyear'] else 0,
+                        'available': int(row['available']) if row['available'] else 0,
+                        'cost': safe_decimal_conversion(row['cost']),
+                        'begining_balance': int(row['begining_balance']) if row['begining_balance'] else 0,
+                        'reference': int(row['reference']) if row['reference'] else 0,
+                        'percentage': safe_decimal_conversion(row['percentage'], 2),
+                        'sellercategory': row['sellercategory'],
+                        'brand': brand, 
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Error saving record for SKU {row['sku']}: {e}")
+                continue
+
+        messages.success(request, "Slow Movers Report generated successfully.")
+
+    class Media:
+            css = {"all": ("admin/css/forms.css", "css/admin/daterange.css")}
+            js = ("admin/js/calendar.js", "js/admin/DateRangeShortcuts.js")
+
+
+
+   
 
 
 
