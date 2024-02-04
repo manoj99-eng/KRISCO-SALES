@@ -12,7 +12,7 @@ from django.db.models import Q
 import logging
 from django.contrib import messages
 from inventory.models import SlowMoversReport
-from .forms import DiscountForm,EditDiscountForm
+from .forms import DiscountForm,EditDiscountForm, EditSalonDiscountForm, SalonDiscountForm
 from django.template.defaultfilters import slugify
 from django.http import JsonResponse
 
@@ -120,6 +120,110 @@ class BrandOfferAdmin(admin.ModelAdmin):
 
     actions = ['generate_offers']
 
+    def edit_discount_salon_item(self,request, sku):
+        response_data = {'success': False, 'message': '', 'data': {}}
+        try:
+            filtered_data_df_json = request.session.get('filtered_data_df')
+            if not filtered_data_df_json:
+                response_data['message'] = 'Session data not found.'
+                return JsonResponse(response_data)
+
+            df = pd.read_json(StringIO(filtered_data_df_json), orient='split')
+            if sku not in df['sku'].values:
+                response_data['message'] = 'Item not found.'
+                return JsonResponse(response_data)
+
+            if request.method == 'POST':
+                form = EditSalonDiscountForm(request.POST)
+                if form.is_valid():
+                    idx = df.index[df['sku'] == sku].tolist()[0]
+                    
+                    # Update the DataFrame with form data
+                    df.at[idx, 'description'] = form.cleaned_data['description']
+                    df.at[idx, 'cost'] = float(form.cleaned_data['cost'])
+                    
+                    # Calculate salon as half of cost directly here instead of relying on form input for salon
+                    salon_price = df.at[idx, 'cost'] / 2
+                    df.at[idx, 'salon'] = salon_price
+                    
+                    df.at[idx, 'discount'] = float(form.cleaned_data['discount'])
+                    df.at[idx, 'offer_price'] = round(salon_price * (1 - df.at[idx, 'discount'] / 100), 2)
+
+                    request.session['filtered_data_df'] = df.to_json(orient='split')
+                    response_data['success'] = True
+                    response_data['message'] = 'Salon item updated successfully.'
+                    response_data['data'] = df.loc[idx].to_dict()
+                    return JsonResponse(response_data)
+                else:
+                    response_data['message'] = 'Form validation error.'
+                    response_data['errors'] = form.errors.as_json()
+                    return JsonResponse(response_data)
+            else:
+                response_data['message'] = 'Invalid request method.'
+                return JsonResponse(response_data)
+        except Exception as e:
+            response_data['message'] = f'An error occurred: {str(e)}'
+            return JsonResponse(response_data)
+
+    def remove_discount_salon_item(self,request, sku):
+        try:
+            filtered_data_df_json = request.session.get('filtered_data_df')
+            if not filtered_data_df_json:
+                messages.error(request, 'Session data not found.')
+                return redirect(request.META.get('HTTP_REFERER', 'redirect_if_referer_not_found'))
+
+            df = pd.read_json(StringIO(filtered_data_df_json), orient='split')
+            df = df[df['sku'] != sku]  # Remove the item
+            request.session['filtered_data_df'] = df.to_json(orient='split')  # Update session
+
+            messages.success(request, 'Item removed successfully.')
+        except Exception as e:
+            messages.error(request, f'An error occurred: {str(e)}')
+        return redirect(request.META.get('HTTP_REFERER', 'redirect_if_referer_not_found'))
+
+    def offer_discount_salon(self,request):
+        context = {}
+        filtered_data_df_json = request.session.get('filtered_data_df')
+
+        # Initialize an empty DataFrame if session data is not found
+        if filtered_data_df_json:
+            df = pd.read_json(StringIO(filtered_data_df_json), orient='split')
+            unique_brands = sorted(df['brand'].unique().tolist())
+            df['salon'] = df['cost'] / 2
+        else:
+            unique_brands = []
+            df = pd.DataFrame(columns=['brand', 'cost', 'salon', 'discount', 'offer_price'])  # Define columns for consistency
+
+        if request.method == 'POST':
+            form = SalonDiscountForm(unique_brands, request.POST)
+            if form.is_valid():
+                cleaned_data = form.cleaned_data
+                if not df.empty:
+                    for brand in unique_brands:
+                        field_name = f"additional_discount_{slugify(brand)}"
+                        additional_discount_rate = cleaned_data.get(field_name, 0) / 100
+                        df.loc[df['brand'] == brand, 'discount'] = round(additional_discount_rate * 100, 2)
+                        df.loc[df['brand'] == brand, 'offer_price'] = round(df['salon'] * (1 - additional_discount_rate), 2)
+
+                    request.session['filtered_data_df'] = df.to_json(orient='split')
+                    messages.success(request, 'Salon offers updated successfully.')
+                    # Reload the page with updated context to show changes immediately
+                    return redirect(request.path)
+                else:
+                    messages.error(request, 'No data found to apply discounts to.')
+            else:
+                # Add form to context to display form errors
+                context['form'] = form
+        else:
+            form = SalonDiscountForm(unique_brands)
+        
+        context['form'] = form
+        if not df.empty:
+            context['df'] = df.to_dict(orient='records')
+
+        # Make sure to use the correct template path
+        return render(request, 'admin/offers/brandoffer/offer_generation_salon.html', context)
+
     def edit_discount_item(self, request, sku):
         response_data = {'success': False, 'message': '', 'data': {}}
         try:
@@ -155,7 +259,7 @@ class BrandOfferAdmin(admin.ModelAdmin):
         except Exception as e:
             response_data['message'] = f'An error occurred: {str(e)}'
             return JsonResponse(response_data)
-        
+    
     def remove_discount_item(self, request, sku):
         try:
             filtered_data_df_json = request.session.get('filtered_data_df')
@@ -211,6 +315,21 @@ class BrandOfferAdmin(admin.ModelAdmin):
                 context['df'] = df.to_dict(orient='records')
 
         return render(request, 'admin/offers/brandoffer/offer_discount.html', context)
+
+    @staticmethod
+    def offer_edit_salon(request):
+        # This method needs to be able to handle the request object directly
+        if 'filtered_data_df' in request.session:
+            filtered_data_df_json = request.session['filtered_data_df']
+            df = pd.read_json(StringIO(filtered_data_df_json), orient='split')
+
+            # Prepare your context with the DataFrame
+            context = {'df': df.to_dict(orient='records')}
+            return render(request, 'admin/offers/brandoffer/offer_edit_salon.html', context)
+        else:
+            # If no DataFrame is found in the session, redirect or show an error
+            messages.error(request, "No data found in session.")
+            return redirect('admin:index')  # Adjust the redirect as needed
 
     @staticmethod
     def offer_edit(request):
@@ -277,8 +396,7 @@ class BrandOfferAdmin(admin.ModelAdmin):
 
             return render(request, 'admin/offers/brandoffer/offer_generation.html', {'value': queryset})
 
-    generate_offers.short_description = 'Generate Offers'
-    filter_offers.short_description = 'Filter Offers'
+    generate_offers.short_description = 'Generate Brand Offers'
 
     def get_urls(self):
         urls = super().get_urls()
@@ -286,8 +404,15 @@ class BrandOfferAdmin(admin.ModelAdmin):
             path('generate_offers/', self.admin_site.admin_view(self.generate_offers), name='generate_offers'),
             path('filter_offers/', self.admin_site.admin_view(self.filter_offers), name='filter_offers'),
             path('offer_discount/', self.admin_site.admin_view(self.offer_discount), name='offer_discount'),
-            path('offer_edit/', self.admin_site.admin_view(self.offer_edit), name='admin_offer_edit'),  # Added trailing slash
-            path('offer_edit/edit/<str:sku>/', self.admin_site.admin_view(self.edit_discount_item), name='edit_discount_item'),  # Wrapped with admin_view
-            path('offer_edit/remove/<str:sku>/', self.admin_site.admin_view(self.remove_discount_item), name='remove_discount_item'),  # Wrapped with admin_view
+            path('offer_edit/', self.admin_site.admin_view(self.offer_edit), name='admin_offer_edit'),
+            path('offer_edit/edit/<str:sku>/', self.admin_site.admin_view(self.edit_discount_item), name='edit_discount_item'),
+            path('offer_edit/remove/<str:sku>/', self.admin_site.admin_view(self.remove_discount_item), name='remove_discount_item'),
+            # Ensure the URL for offer_edit_salon is for viewing the salon offers, not editing or removing directly
+            path('offer_edit_salon/', self.admin_site.admin_view(self.offer_edit_salon), name='admin_offer_salon'),
+            path('offer_discount_salon/', self.admin_site.admin_view(self.offer_discount_salon), name='offer_discount_salon'),
+            # Correct the paths for editing and removing salon items to match the salon offer editing and removing operations
+            path('offer_edit_salon/edit/<str:sku>/', self.admin_site.admin_view(self.edit_discount_salon_item), name='edit_discount_salon_item'),
+            path('offer_edit_salon/remove/<str:sku>/', self.admin_site.admin_view(self.remove_discount_salon_item), name='remove_discount_salon_item'),
         ]
         return custom_urls + urls
+

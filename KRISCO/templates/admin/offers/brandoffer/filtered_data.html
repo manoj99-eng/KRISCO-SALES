@@ -26,6 +26,20 @@
 .custom-button:hover {
     background-color: #4E758D;
 }
+
+.navbar {
+    background-color: #f8f9fa; /* Light grey background, change as needed */
+    padding: 10px 15px;
+    margin-bottom: 20px; /* Space below the navbar */
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,.1); /* subtle shadow for depth */
+}
+
+.navbar .button-container {
+    display: flex;
+    gap: 10px; /* Space between buttons */
+}
+
 </style>
 {% endblock %}
 {% block content %}
@@ -57,6 +71,13 @@
         <br>
         <br>
     </div>
-    <a href="{% url 'admin:offer_discount' %}" class="custom-button">CONFIRM SELECTION</a>
+    
+    <div class="navbar">
+        <div class="button-container">
+          <!-- Calculate Discounts button -->
+          <a href="{% url 'admin:offer_discount' %}" class="custom-button">CONFIRM SELECTION REGULAR</a>
+          <a href="{% url 'admin:offer_discount_salon' %}" class="custom-button">CONFRIM SELECTION SALOON</a>
+        </div>
+      </div>
 </div>
 {% endblock %}

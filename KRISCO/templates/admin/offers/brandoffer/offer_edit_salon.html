@@ -1,0 +1,272 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+{% load i18n %}
+
+{% block extrahead %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" />
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<!-- Django Messages -->
+{% if messages %}
+<div class="messages">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+  {% if data_with_discounts %}
+  <h2>Discount Data Entered:</h2>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Brand</th>
+        <th>Discount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in data_with_discounts %}
+      <tr>
+        <td>{{ entry.brand }}</td>
+        <td>{{ entry.discount }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  
+  {% if not df_empty %}
+  <h2>Updated Offered Prices:</h2>
+  <table class="table" id="discountedPricesTable">
+    <thead>
+      <tr>
+        <th>SKU</th>
+        <th>Brand</th>
+        <th>Upc</th>
+        <th>Description</th>
+        <th>Available</th>
+        <th>Cost</th>
+        <th>Salon</th>
+        <th>Discount</th>
+        <th>Offer Price</th>
+        <th>Edit</th>
+        <th>Remove</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in df %}
+      <tr data-id="{{ row.id }}">
+        <td>{{ row.sku }}</td>
+        <td>{{ row.brand }}</td>
+        <td>{{ row.upc }}</td>
+        <td>{{ row.description }}</td>
+        <td>{{ row.available }}</td>
+        <td>{{ row.cost }}</td>
+        <td>{{row.salon}}</td>
+        <td>{{ row.discount }}</td>
+        <td>{{ row.offer_price }}</td>
+        <td>
+          <button type="button" class="btn btn-primary edit-item" 
+                  data-toggle="modal" 
+                  data-target="#editModal" 
+                  data-id="{{ row.id }}" 
+                  data-sku="{{ row.sku }}" 
+                  data-upc="{{ row.upc }}" 
+                  data-description="{{ row.description }}" 
+                  data-available="{{ row.available }}" 
+                  data-cost="{{ row.cost }}" 
+                  data-salon="{{row.salon}}"
+                  data-discount="{{ row.discount }}" 
+                  data-offer-price="{{ row.offer_price }}">
+            Edit
+          </button>
+        </td>
+        <td>
+          <button class="btn btn-danger remove-item" data-sku="{{ row.sku }}">Remove</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+<!-- Bootstrap Modal for Editing -->
+<div class="modal fade" id="editModal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editModalLabel">Edit Item</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <!-- Modal Body for Editing -->
+        <div class="form-group">
+          <label>SKU:</label>
+          <input type="text" class="form-control" id="modal-sku" readonly>
+        </div>
+        <div class="form-group">
+          <label>Available:</label>
+          <input type="text" class="form-control" id="modal-available" readonly>
+        </div>
+        <div class="form-group">
+          <label>UPC:</label>
+          <input type="text" class="form-control" id="modal-upc" readonly>
+        </div>
+        <div class="form-group">
+          <label for="modal-description">Description:</label>
+          <input type="text" class="form-control" id="modal-description">
+        </div>
+        <div class="form-group">
+          <label for="modal-cost">Cost:</label>
+          <input type="number" class="form-control" id="modal-cost">
+        </div>
+        <div class="form-group">
+          <label for="modal-salon">Salon:</label>
+          <input type="number" class="form-control" id="modal-salon">
+        </div>
+        <div class="form-group">
+          <label for="modal-discount">Discount (%):</label>
+          <input type="number" class="form-control" id="modal-discount">
+        </div>
+        <div class="form-group">
+          <label for="modal-offer-price">Offer Price:</label>
+          <input type="number" class="form-control" id="modal-offer-price">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="save-changes">Save changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Bootstrao modal for remove conformation -->
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmationModal" tabindex="-1" aria-labelledby="deleteConfirmationModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteConfirmationModalLabel">Confirm Delete</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        Are you sure you want to remove this item?
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmDelete">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block javascript %}
+<script>
+  $(document).ready(function() {
+      // Function to get CSRF token from cookies
+      function getCSRFToken() {
+          let cookieValue = null;
+          const name = 'csrftoken';
+          if (document.cookie && document.cookie !== '') {
+              const cookies = document.cookie.split(';');
+              for (let i = 0; i < cookies.length; i++) {
+                  const cookie = jQuery.trim(cookies[i]);
+                  if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                      cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                      break;
+                  }
+              }
+          }
+          return cookieValue;
+      }
+  
+      // Open the edit modal and populate its fields
+      $(document).on('click', '.edit-item', function() {
+          const sku = $(this).data('sku'); // Extract SKU from the button data attribute
+          // Populate modal inputs
+          $('#modal-sku').val($(this).data('sku'));
+          $('#modal-available').val($(this).data('available'));
+          $('#modal-upc').val($(this).data('upc'));
+          $('#modal-description').val($(this).data('description'));
+          $('#modal-cost').val($(this).data('cost'));
+          $('#modal-salon').val($(this).data('salon'))
+          $('#modal-discount').val($(this).data('discount'));
+          $('#modal-offer-price').val($(this).data('offer-price'));
+          // Store the SKU in the modal for later use
+          $('#editModal').data('sku', sku);
+      });
+  
+      // Handle the save changes button click
+      $('#save-changes').on('click', function() {
+          const sku = $('#editModal').data('sku'); // Retrieve SKU from the modal
+          const postData = {
+              'description': $('#modal-description').val(),
+              'cost': $('#modal-cost').val(),
+              'salon': $('#modal-salon').val(),
+              'discount': $('#modal-discount').val(),
+              'offer_price': $('#modal-offer-price').val(),
+              'csrfmiddlewaretoken': getCSRFToken(),
+          };
+  
+          $.ajax({
+              type: 'POST',
+              url: `/admin/offers/brandoffer/offer_edit_salon/edit/${sku}/`,
+              data: postData,
+              success: function(response) {
+                  $('#editModal').modal('hide');
+                  if (response.success) {
+                      // Optionally, directly update the table or show a success message
+                      location.reload(); // or use updateMessages("Item updated successfully.", "success");
+                  } else {
+                      // Handle failure
+                      console.error("Error:", response.error || "An unknown error occurred.");
+                  }
+              },
+              error: function(xhr, status, error) {
+                  console.error("Error:", error);
+                  $('#editModal').modal('hide');
+              }
+          });
+      });
+  
+      // Prepare and show delete confirmation modal
+      $('.remove-item').on('click', function() {
+          const sku = $(this).data('sku');
+          $('#deleteConfirmationModal').data('sku', sku);
+          $('#deleteConfirmationModal').modal('show');
+      });
+  
+      // Handle the confirmation of deletion
+      $('#confirmDelete').on('click', function() {
+          const sku = $('#deleteConfirmationModal').data('sku');
+          $.ajax({
+              type: 'POST',
+              url: `/admin/offers/brandoffer/offer_edit_salon/remove/${sku}/`,
+              data: {
+                  'csrfmiddlewaretoken': getCSRFToken(),
+              },
+              success: function(response) {
+                  $('#deleteConfirmationModal').modal('hide');
+                  location.reload(); // Reload to reflect changes and show any success message
+              },
+              error: function(xhr, status, error) {
+                  console.error("Error:", error);
+                  $('#deleteConfirmationModal').modal('hide');
+                  // Show error message if needed
+              }
+          });
+      });
+  });
+  </script>
+   
+{% endblock %}
+{% endblock %}

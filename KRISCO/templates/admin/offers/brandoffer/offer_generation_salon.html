@@ -53,13 +53,13 @@
 
 {% block content %}
 <div class="app-offers model-brandoffer change-form">
-    <h1>{% trans 'Special Offer Discounts' %}</h1>
+    <h1>{% trans 'Sepcial Offer Salon Discounts' %}</h1>
     <!-- Navbar with buttons -->
 <div class="navbar">
     <div class="button-container">
       <!-- Calculate Discounts button -->
       <!-- Edit Offer button -->
-      <a href="{% url 'admin:admin_offer_edit' %}" class="custom-button">Edit Offer</a>
+      <a href="{% url 'admin:admin_offer_salon' %}" class="custom-button">Edit Offer</a>
     </div>
   </div>
   <div class="app-offers model-brandoffer change-form">
@@ -74,68 +74,50 @@
         
         <div class="form-row horizontal-form-row">
             {% for field in form %}
-            <div class="fieldBox field-horizontal field-{{ field.name }">
+            <div class="fieldBox field-horizontal field-{{ field.name }}">
                 {{ field.errors }}
                 {{ field.label_tag }} 
                 {{ field }}
             </div>
             {% endfor %}
         </div>
-     <div class="submit-row ">
-      <input type="submit" value="{% trans 'Calculate Discounts' %}" class="default" name="_save" />
-    </div>
-    <br>
+        <div class="submit-row">
+            <input type="submit" value="{% trans 'Apply Salon Discounts' %}" class="btn btn-primary" name="_save" />
+        </div>
+    </form>
 
-  {% if data_with_discounts %}
-  <h2>Discount Data Entered:</h2>
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Brand</th>
-        <th>Discount</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for entry in data_with_discounts %}
-      <tr>
-        <td>{{ entry.brand }}</td>
-        <td>{{ entry.discount }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
-  
-  {% if not df_empty %}
-  <h2>Updated Offered Prices:</h2>
-  <table class="table" id="discountedPricesTable">
-    <thead>
-      <tr>
-        <th>SKU</th>
-        <th>Brand</th>
-        <th>Upc</th>
-        <th>Description</th>
-        <th>Available</th>
-        <th>Cost</th>
-        <th>Discount</th>
-        <th>Offer Price</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in df %}
-      <tr data-id="{{ row.id }}">
-        <td>{{ row.sku }}</td>
-        <td>{{ row.brand }}</td>
-        <td>{{ row.upc }}</td>
-        <td>{{ row.description }}</td>
-        <td>{{ row.available }}</td>
-        <td>{{ row.cost }}</td>
-        <td>{{ row.discount }}</td>
-        <td>{{ row.offer_price }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
+    {% if df %}
+        <h2>Updated Salon Offered Prices:</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>Brand</th>
+                    <th>Description</th>
+                    <th>Available</th>
+                    <th>Cost</th>
+                    <th>Salon</th>
+                    <th>Discount (%)</th>
+                    <th>Offer Price</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in df %}
+                <tr>
+                    <td>{{ row.sku }}</td>
+                    <td>{{ row.brand }}</td>
+                    <td>{{ row.description }}</td>
+                    <td>{{ row.available }}</td>
+                    <td>{{ row.cost }}</td>
+                    <td>{{ row.salon }}</td>
+                    <td>{{ row.discount }}</td>
+                    <td>{{ row.offer_price }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No data available to display.</p>
+    {% endif %}
 </div>
 {% endblock %}
