@@ -1,7 +1,35 @@
 {% extends "admin/base_site.html" %}
+{% load static %}
+{% load i18n %}
+{% block extrahead %}
+<style>
+/* Make the button block-level and equal to the table width */
+.container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
 
+.custom-button {
+    display: block;
+    width: fit-content;
+    background-color: #84ADC5;
+    color: #ffffff !important; /* White text color for better contrast */
+    border: none;
+    border-radius: 4px;
+    padding: 10px 20px;
+    cursor: pointer;
+    margin-top: 10px; /* Adjust the margin as needed */
+}
+
+/* Hover effect for the button */
+.custom-button:hover {
+    background-color: #4E758D;
+}
+</style>
+{% endblock %}
 {% block content %}
-<div id="content-main">
+<div id="content-main" class="container">
     <h1>Filtered Data</h1>
     <div class="table-responsive">
         <table class="table table-primary">
@@ -26,8 +54,9 @@
                 {% endfor %}
             </tbody>
         </table>
+        <br>
+        <br>
     </div>
-    <button><a href="{% url 'admin:offer_discount' %}">Confrim Selection</a></button>
+    <a href="{% url 'admin:offer_discount' %}" class="custom-button">CONFIRM SELECTION</a>
 </div>
-
 {% endblock %}

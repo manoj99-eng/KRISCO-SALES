@@ -27,10 +27,40 @@ class DiscountForm(forms.Form):
 
 
 class EditDiscountForm(forms.Form):
-    new_discount = forms.DecimalField(
-        label='New Discount',
+    description = forms.CharField(
+        label='Description',
+        max_length=255,
+        widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+    cost = forms.DecimalField(
+        label='Cost',
+        max_digits=10,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
+    )
+    discount = forms.DecimalField(
+        label='Discount (%)',
         max_digits=5,
         decimal_places=2,
         required=True,
-        widget=forms.NumberInput(attrs={'step': 0.01})
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'})
     )
+    offer_price = forms.DecimalField(
+        label='Offer Price',
+        max_digits=10,
+        decimal_places=2,
+        required=False,  # Not required because it's calculated based on cost and discount
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'readonly': 'readonly'})  # Read-only because it's calculated
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        cost = cleaned_data.get('cost')
+        discount = cleaned_data.get('discount')
+
+        # Calculate offer_price if both cost and discount are provided
+        if cost is not None and discount is not None:
+            offer_price = cost * (1 - discount / 100)
+            cleaned_data['offer_price'] = round(offer_price, 2)  # Round to 2 decimal places
+
+        return cleaned_data

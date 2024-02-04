@@ -1,202 +1,127 @@
-{% extends "admin/base_site.html" %}  <!-- Use the appropriate admin base template -->
+{% extends "admin/base_site.html" %}
 {% load static %}
 {% load i18n %}
 
 {% block extrahead %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" />
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
 <style>
-    .horizontal-form-row {
+  .horizontal-form-row {
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
-}
-
-.fieldBox.field-horizontal {
+  }
+  .fieldBox.field-horizontal {
     display: flex;
     align-items: center;
     margin-right: 30px; /* Spacing between fields */
-}
-
-.fieldBox.field-horizontal:last-child {
+  }
+  .fieldBox.field-horizontal:last-child {
     margin-right: 0; /* Remove margin for the last field */
-}
-
-.label-field-container label {
+  }
+  .label-field-container label {
     margin-right: 10px;
+  }
+  .custom-button {
+    background-color: #84ADC5;
+    color: #ffffff !important; /* White text color for better contrast */
+    border: none;
+    border-radius: 4px;
+    padding: 10px 20px;
+    cursor: pointer;
+    margin-top: 10px; /* Adjust the margin as needed */
 }
 
+/* Hover effect for the button */
+.custom-button:hover {
+    background-color: #4E758D;
+}
 </style>
 {% endblock %}
 
-
 {% block content %}
-
 <div class="app-offers model-brandoffer change-form">
-    <h1>{% trans 'Offer Discounts' %}</h1>
+  <h1>{% trans 'Offer Discounts' %}</h1>
 
-    <form method="post" id="discount_form" class="form-horizontal">
-        {% csrf_token %}
-        {% if form.non_field_errors %}
-            <div class="alert alert-danger" role="alert">
-                {{ form.non_field_errors }}
-            </div>
-        {% endif %}
-
-        <div class="form-row horizontal-form-row">
-            {% for field in form %}
-                <div class="fieldBox field-horizontal field-{{ field.name }}">
-                    {{ field.errors }}
-                    {{ field.label_tag }} 
-                    {{ field }}
-                </div>
-            {% endfor %}
-        </div>
-        <br>
-        <br>
-        <div class="submit-row">
-            <input type="submit" value="{% trans 'Calculate Discounts' %}" class="default" name="_save" />
-        </div>
-    </form>
-
-    {% if data_with_discounts %}
-        <h2>Discount Data Entered:</h2>
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Brand</th>
-                    <th>Discount</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for entry in data_with_discounts %}
-                    <tr>
-                        <td>{{ entry.brand }}</td>
-                        <td>{{ entry.discount }}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+  <form method="post" id="discount_form" class="form-horizontal">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+    <div class="alert alert-danger" role="alert">
+      {{ form.non_field_errors }}
+    </div>
+  </form>
     {% endif %}
-    
-    {% if not df_empty %}
-        <h2>Updated Offered Prices:</h2>
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>SKU</th>
-                    <th>Brand</th>
-                    <th>Description</th>
-                    <th>Available</th>
-                    <th>Cost</th>
-                    <th>Discount</th>
-                    <th>Offer Price</th>
-                    <th>Edit</th>
-                    <th>Remove</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for index, row in df.iterrows %}
-                    <tr>
-                        <td>{{ row.sku }}</td>
-                        <td>{{ row.brand }}</td>
-                        <td>{{ row.description }}</td>
-                        <td>{{ row.available }}</td>
-                        <td>{{ row.cost }}</td>
-                        <td>{{ row.discount }}</td>
-                        <td>{{ row.offer_price }}</td>
-                        <td>
-                            <button class="edit-btn" data-id="{{ item.Index }}">Edit</button>
-                        </td>
-                        <td>
-                            <button class="remove-btn" data-id="{{ item.Index }}">Remove</button>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% endif %}
+
+    <div class="form-row horizontal-form-row">
+      {% for field in form %}
+      <div class="fieldBox field-horizontal field-{{ field.name }}">
+        {{ field.errors }}
+        {{ field.label_tag }} 
+        {{ field }}
+      </div>
+      {% endfor %}
+    </div>
+    <br>
+     <div class="submit-row">
+      <input type="submit" value="{% trans 'Calculate Discounts' %}" class="default" name="_save" />
+    </div>
+    <br>
+   <div>
+    <a href="{% url 'admin:admin_offer_edit' %}" class="custom-button ">Edit Offer</a>
+   </div>
+<br>
+
+  {% if data_with_discounts %}
+  <h2>Discount Data Entered:</h2>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Brand</th>
+        <th>Discount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in data_with_discounts %}
+      <tr>
+        <td>{{ entry.brand }}</td>
+        <td>{{ entry.discount }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  
+  {% if not df_empty %}
+  <h2>Updated Offered Prices:</h2>
+  <table class="table" id="discountedPricesTable">
+    <thead>
+      <tr>
+        <th>SKU</th>
+        <th>Brand</th>
+        <th>Upc</th>
+        <th>Description</th>
+        <th>Available</th>
+        <th>Cost</th>
+        <th>Discount</th>
+        <th>Offer Price</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in df %}
+      <tr data-id="{{ row.id }}">
+        <td>{{ row.sku }}</td>
+        <td>{{ row.brand }}</td>
+        <td>{{ row.upc }}</td>
+        <td>{{ row.description }}</td>
+        <td>{{ row.available }}</td>
+        <td>{{ row.cost }}</td>
+        <td>{{ row.discount }}</td>
+        <td>{{ row.offer_price }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
 </div>
-
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
-<script>
-    // JavaScript for handling Edit and Remove actions in Django admin
-
-// Function to handle the edit action
-function editDiscountItem(item_id) {
-    // Retrieve the CSRF token
-    var csrftoken = getCookie('csrftoken');
-
-    // Retrieve the new discount value from the input field
-    var newDiscount = parseFloat($('#new_discount').val());
-
-    // Send a POST request to the server to edit the discount item
-    $.ajax({
-        type: 'POST',
-        url: `/admin/brandoffer/offer_discount/edit/${item_id}/`, // Replace with your URL
-        data: {
-            csrfmiddlewaretoken: csrftoken,
-            new_discount: newDiscount
-        },
-        success: function(response) {
-            if (response.success) {
-                // Reload the page or update the table to reflect the changes
-                location.reload();
-            } else {
-                // Handle form errors or display a message
-                console.error('Error:', response.errors);
-            }
-        },
-        error: function(xhr, status, error) {
-            // Handle AJAX error
-            console.error('AJAX Error:', error);
-        }
-    });
-}
-
-// Function to handle the remove action
-function removeDiscountItem(item_id) {
-    // Retrieve the CSRF token
-    var csrftoken = getCookie('csrftoken');
-
-    // Send a POST request to the server to remove the discount item
-    $.ajax({
-        type: 'POST',
-        url: `/admin/brandoffer/offer_discount/remove/${item_id}/`, // Replace with your URL
-        data: {
-            csrfmiddlewaretoken: csrftoken
-        },
-        success: function(response) {
-            if (response.success) {
-                // Reload the page or update the table to reflect the changes
-                location.reload();
-            } else {
-                // Handle any errors or display a message
-                console.error('Error:', response.errors);
-            }
-        },
-        error: function(xhr, status, error) {
-            // Handle AJAX error
-            console.error('AJAX Error:', error);
-        }
-    });
-}
-
-// Function to get the CSRF token from cookies
-function getCookie(name) {
-    var cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        var cookies = document.cookie.split(';');
-        for (var i = 0; i < cookies.length; i++) {
-            var cookie = jQuery.trim(cookies[i]);
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
-</script>
 {% endblock %}
-

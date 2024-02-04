@@ -2,7 +2,7 @@ from io import StringIO
 import json
 from django.urls import path,reverse
 from django.contrib import admin
-from django.shortcuts import render
+from django.shortcuts import render,redirect
 from django.http import HttpResponse, HttpResponseRedirect
 from django.db import transaction
 import pandas as pd
@@ -110,6 +110,8 @@ class Weekly_OfferAdmin(admin.ModelAdmin):
             return render(request, 'admin/import_csv.html', context)
 
 
+
+logger = logging.getLogger(__name__)
 @admin.register(BrandOffer)
 class BrandOfferAdmin(admin.ModelAdmin):
     list_display = ['sku', 'description', 'available', 'cost', 'discount', 'offer_price']
@@ -118,108 +120,112 @@ class BrandOfferAdmin(admin.ModelAdmin):
 
     actions = ['generate_offers']
 
-    def edit_discount_item(self, request, item_id):
-        # Retrieve the DataFrame from the session
-        filtered_data_df_json = request.session.get('filtered_data_df')
-        if filtered_data_df_json:
+    def edit_discount_item(self, request, sku):
+        response_data = {'success': False, 'message': '', 'data': {}}
+        try:
+            filtered_data_df_json = request.session.get('filtered_data_df')
+            if not filtered_data_df_json:
+                response_data['message'] = 'Session data not found.'
+                return JsonResponse(response_data)
+
             df = pd.read_json(StringIO(filtered_data_df_json), orient='split')
-        else:
-            df = None
+            if sku not in df['sku'].values:
+                response_data['message'] = 'Item not found.'
+                return JsonResponse(response_data)
 
-        # Find the item in the DataFrame by `item_id`
-        item_index = df[df.index == item_id].index[0]
+            if request.method == 'POST':
+                form = EditDiscountForm(request.POST)
+                if form.is_valid():
+                    idx = df.index[df['sku'] == sku].tolist()[0]
+                    df.at[idx, 'description'] = form.cleaned_data['description']
+                    df.at[idx, 'cost'] = float(form.cleaned_data['cost'])
+                    df.at[idx, 'discount'] = float(form.cleaned_data['discount'])
+                    df.at[idx, 'offer_price'] = round(float(form.cleaned_data['cost']) * (1 - float(form.cleaned_data['discount']) / 100), 2)
 
-        if request.method == 'POST':
-            form = EditDiscountForm(request.POST)
-            if form.is_valid():
-                # Update the item with new data from the request
-                new_discount = form.cleaned_data.get('new_discount', 0.0)
-                df.at[item_index, 'discount'] = new_discount
-
-                # Recalculate the offer price
-                df.at[item_index, 'offer_price'] = df.at[item_index, 'cost'] * (1 - new_discount / 100)
-                df.at[item_index, 'offer_price'] = round(df.at[item_index, 'offer_price'], 2)
-
-                # Save the updated DataFrame back to the session
-                updated_df_json = df.to_json(orient='split')
-                request.session['filtered_data_df'] = updated_df_json
-
-                # Return a JSON response indicating success
-                return JsonResponse({'success': True})
+                    request.session['filtered_data_df'] = df.to_json(orient='split')
+                    response_data['success'] = True
+                    response_data['message'] = 'Item updated successfully.'
+                    return JsonResponse(response_data)
+                else:
+                    response_data['message'] = 'Form validation error.'
+                    return JsonResponse(response_data)
             else:
-                # Return a JSON response indicating form errors
-                return JsonResponse({'success': False, 'errors': form.errors})
-        else:
-            # Return an appropriate response for rendering the edit form
-            return render(request, 'admin/offers/brandoffer/edit_discount_item.html', {'item_id': item_id})
+                response_data['message'] = 'Invalid request method.'
+                return JsonResponse(response_data)
+        except Exception as e:
+            response_data['message'] = f'An error occurred: {str(e)}'
+            return JsonResponse(response_data)
+        
+    def remove_discount_item(self, request, sku):
+        try:
+            filtered_data_df_json = request.session.get('filtered_data_df')
+            if not filtered_data_df_json:
+                messages.error(request, 'Session data not found.')
+                return redirect(request.META.get('HTTP_REFERER', 'redirect_if_referer_not_found'))
 
-    def remove_discount_item(self, request, item_id):
-        # Retrieve the DataFrame from the session
-        filtered_data_df_json = request.session.get('filtered_data_df')
-        if filtered_data_df_json:
             df = pd.read_json(StringIO(filtered_data_df_json), orient='split')
-        else:
-            df = None
+            
+            # Logic to remove item based on sku
+            df = df[df['sku'] != sku]
+            request.session['filtered_data_df'] = df.to_json(orient='split')
 
-        # Remove the item from the DataFrame by `item_id`
-        df.drop(item_id, inplace=True)
-
-        # Save the updated DataFrame back to the session
-        updated_df_json = df.to_json(orient='split')
-        request.session['filtered_data_df'] = updated_df_json
-
-        # Return a JSON response indicating success
-        return JsonResponse({'success': True})
-
+            messages.success(request, 'Item removed successfully.')
+        except Exception as e:
+            messages.error(request, f'An error occurred: {str(e)}')
+        return redirect(request.META.get('HTTP_REFERER', 'redirect_if_referer_not_found'))
 
     def offer_discount(self, request):
-        # Retrieve the DataFrame from the session
+        context = {}
         filtered_data_df_json = request.session.get('filtered_data_df')
         if filtered_data_df_json:
             df = pd.read_json(StringIO(filtered_data_df_json), orient='split')
+            unique_brands = sorted(df['brand'].unique().tolist())
         else:
-            df = None
-
-        # Initialize unique_brands to an empty list by default
-        unique_brands = df['brand'].unique() if df is not None and not df.empty else []
+            unique_brands = []  # Fallback if there's no DataFrame data
 
         if request.method == 'POST':
-            form = DiscountForm(unique_brands, request.POST)
+            form = DiscountForm(unique_brands, request.POST)  # Initialize form with unique brands
             if form.is_valid():
-                # Process the form data
-                discounts = {brand: form.cleaned_data.get(f"discount_{slugify(brand)}", 0.0) for brand in unique_brands}
-
-                # Apply discounts to the DataFrame
-                if df is not None:
-                    for brand, discount in discounts.items():
-                        df.loc[df['brand'] == brand, 'discount'] = discount
-
-                    df['discount'] = df['discount'].astype(float)
-                    df['offer_price'] = df['cost'] * (1 - df['discount'] / 100)
-                    df['offer_price'] = df['offer_price'].round(2)
-                    df['cost'] = df['cost'].round(2)
-
+                cleaned_data = form.cleaned_data
+                if filtered_data_df_json:
+                    # Loop through each dynamically created field and apply the discount
+                    for brand in unique_brands:
+                        field_name = f"discount_{slugify(brand)}"
+                        discount_rate = cleaned_data.get(field_name, 0) / 100
+                        # Round the discount rate to 2 decimals and apply it
+                        df.loc[df['brand'] == brand, 'discount'] = round(discount_rate * 100, 2)  # Store as a percentage, rounded
+                        df.loc[df['brand'] == brand, 'offer_price'] = (df['cost'] * (1 - discount_rate)).round(2)
                     # Save the updated DataFrame back to the session
-                    updated_df_json = df.to_json(orient='split')
-                    request.session['filtered_data_df'] = updated_df_json
-                    discounts_applied = True
+                    request.session['filtered_data_df'] = df.to_json(orient='split')
+                    context['df'] = df.to_dict(orient='records')  # Prepare data for template rendering
                 else:
-                    discounts_applied = False
+                    context['error'] = 'No data found to apply discounts to.'
             else:
-                discounts_applied = False
+                context['form'] = form
         else:
-            form = DiscountForm(unique_brands)
-            discounts_applied = False
+            form = DiscountForm(unique_brands)  # Initialize form with 'unique_brands' for GET requests
+            context['form'] = form
 
-        context = {
-            'form': form,
-            'unique_brands': unique_brands,
-            'discounts_applied': discounts_applied,
-            'df': df if df is not None and not df.empty else None,
-        }
+            # Prepare existing DataFrame data for template rendering, if available
+            if filtered_data_df_json:
+                context['df'] = df.to_dict(orient='records')
+
         return render(request, 'admin/offers/brandoffer/offer_discount.html', context)
 
+    @staticmethod
+    def offer_edit(request):
+        # This method needs to be able to handle the request object directly
+        if 'filtered_data_df' in request.session:
+            filtered_data_df_json = request.session['filtered_data_df']
+            df = pd.read_json(StringIO(filtered_data_df_json), orient='split')
 
+            # Prepare your context with the DataFrame
+            context = {'df': df.to_dict(orient='records')}
+            return render(request, 'admin/offers/brandoffer/offer_edit.html', context)
+        else:
+            # If no DataFrame is found in the session, redirect or show an error
+            messages.error(request, "No data found in session.")
+            return redirect('admin:index')  # Adjust the redirect as needed
 
     def generate_offers(self, request, queryset):
         # Retrieve selected filters from session storage
@@ -263,7 +269,6 @@ class BrandOfferAdmin(admin.ModelAdmin):
 
                 # Create a DataFrame 'df' from the 'filtered_data'
                 df = pd.DataFrame(list(filtered_data.values()))
-
                 # Store the DataFrame in the session
                 request.session['filtered_data_df'] = df.to_json(orient='split')
 
@@ -281,8 +286,8 @@ class BrandOfferAdmin(admin.ModelAdmin):
             path('generate_offers/', self.admin_site.admin_view(self.generate_offers), name='generate_offers'),
             path('filter_offers/', self.admin_site.admin_view(self.filter_offers), name='filter_offers'),
             path('offer_discount/', self.admin_site.admin_view(self.offer_discount), name='offer_discount'),
-            path('offer_discount/edit/<int:item_id>/', self.admin_site.admin_view(self.edit_discount_item), name='edit_discount_item'),
-            path('offer_discount/remove/<int:item_id>/', self.admin_site.admin_view(self.remove_discount_item), name='remove_discount_item'),
-    
+            path('offer_edit/', self.admin_site.admin_view(self.offer_edit), name='admin_offer_edit'),  # Added trailing slash
+            path('offer_edit/edit/<str:sku>/', self.admin_site.admin_view(self.edit_discount_item), name='edit_discount_item'),  # Wrapped with admin_view
+            path('offer_edit/remove/<str:sku>/', self.admin_site.admin_view(self.remove_discount_item), name='remove_discount_item'),  # Wrapped with admin_view
         ]
         return custom_urls + urls
