@@ -1,8 +1,18 @@
-from django.urls import path
-from .views import *
 from django.conf.urls.static import static
 from django.conf import settings
 from django.contrib import admin
+from django.urls import path
+from .views import WeeklyOffersView, AddToPreviewView, update_quantity_view, SubmitPreviewView, ThankYouView
+
+urlpatterns = [
+    # Other URL patterns
+    path('weekly-offers/', WeeklyOffersView.as_view(), name='weekly-offers'),
+    path('weekly-offers/add-to-preview/', AddToPreviewView.as_view(), name='add-to-preview'),
+    path('update-quantity/', update_quantity_view, name='update-quantity'),
+    path('submit-preview/', SubmitPreviewView.as_view(), name='submit-preview'),
+    path('thank-you/', ThankYouView.as_view(), name='thank-you'),
+    # Other URL patterns
+]
 
 
 urlpatterns = [

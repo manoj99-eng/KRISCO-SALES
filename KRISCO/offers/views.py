@@ -148,6 +148,9 @@ class SubmitPreviewView(View):
 
             # Return a response indicating failure
             return JsonResponse({'success': False, 'error': 'Failed to submit the order'})
+        
+
+        
 class ThankYouView(View):
     template_name = 'thankyou.html'
 
