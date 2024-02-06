@@ -276,7 +276,7 @@ def safe_decimal_conversion(value, default=Decimal(0)):
 @admin.register(SlowMoversReport)
 class SlowMoversReportAdmin(admin.ModelAdmin):
     list_display = ['sku', 'upc', 'brand','item_classification', 'description', 'qtyin_oneyear', 'qtyout_oneyear', 'balance_oneyear', 'available', 'cost', 'sellercategory']
-    list_filter = (('report_date', DateRangeFilter),'sellercategory','item_classification','brand')
+    list_filter = ('sellercategory','item_classification','brand')
     search_fields = ['sku', 'upc', 'item_classification', 'description', 'qtyin_oneyear', 'qtyout_oneyear', 'balance_oneyear', 'available', 'cost', 'sellercategory']
     actions = ['generate_slow_movers_report']
 
@@ -296,7 +296,7 @@ class SlowMoversReportAdmin(admin.ModelAdmin):
         df_stock['item_classification'] = df_stock['item_classification'].fillna('UNKNOWN')
 
         # Remove specific suffixes from SKU
-        suffixes_to_remove = ['-D', '-NZ', '-HK', '-SING', '-R', '-X', '-NL','-NC','NOBOX', '-NO BOX', '-TESTER', '-SAMPLE', '-SAMPLES', '-SAMPLER', '-SAMPLE KIT']
+        suffixes_to_remove = ['-D', '*', '-D*', '-A', '-VD', '*D', '-NZ', '-HK', '-SING', '-R', '-X', '-NL','-NC','NOBOX', '-NO BOX', '-TESTER', '-SAMPLE', '-SAMPLES', '-SAMPLER', '-SAMPLE KIT']
         for suffix in suffixes_to_remove:
             df_stock = df_stock[~df_stock['sku'].str.endswith(suffix, na=False)]
 

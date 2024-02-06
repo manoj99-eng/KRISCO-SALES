@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.validators import MinValueValidator
 from decimal import Decimal
+from django.contrib.auth.models import User
 
 product_category = (
     ("Haircare", "Haircare"),
@@ -38,17 +39,35 @@ class Weekly_Offer(models.Model):
 
 
 class BrandOffer(models.Model):
-    sku = models.CharField(max_length=200, unique=True)
-    upc = models.CharField(max_length=200)
-    description = models.CharField(max_length=500)
-    available = models.IntegerField()
-    cost = models.DecimalField(max_digits=10, decimal_places=2)
-    discount = models.DecimalField(max_digits=5, decimal_places=2)
-    offer_price = models.DecimalField(max_digits=10, decimal_places=2)
+    OFFER_TYPE_CHOICES = [
+        ('SALON', 'SALON'),
+        ('REGULAR', 'REGULAR'),
+    ]
+    date = models.DateField()
+    time = models.TimeField()
+    offer_type = models.CharField(max_length=7, choices=OFFER_TYPE_CHOICES)
+    offer_file = models.FileField()
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_person_first_name = models.CharField(max_length=255)
+    created_person_last_name = models.CharField(max_length=255)
+    created_person_email = models.EmailField()
+    reason_for_offer_generation = models.TextField()
+
+    def save(self, *args, **kwargs):
+        if not self.id:  # If this is a new object, not updating
+            # Automatically set created_by to the current user
+            # This assumes you have access to request.user, typically set in your view before calling save()
+            # self.created_by = request.user  # Uncomment and adjust in your actual view logic
+
+            # Automatically populate first_name, last_name, and email from the created_by user
+            self.created_person_first_name = self.created_by.first_name
+            self.created_person_last_name = self.created_by.last_name
+            self.created_person_email = self.created_by.email
+
+        super(BrandOffer, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.sku} - {self.description}"
-
+        return f"{self.created_person_first_name} {self.created_person_last_name}'s Offer on {self.date}"
     class Meta:
         verbose_name = 'Brand Offer'
         verbose_name_plural = 'Brand Offers'

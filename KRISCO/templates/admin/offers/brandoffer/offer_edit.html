@@ -6,6 +6,35 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" />
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+<style>
+  .custom-button {
+      background-color: #84ADC5;
+      color: #ffffff !important; /* White text color for better contrast */
+      border: none;
+      border-radius: 4px;
+      padding: 10px 20px;
+      cursor: pointer;
+      margin-top: 10px; /* Adjust the margin as needed */
+ }
+  
+  /* Hover effect for the button */
+  .custom-button:hover {
+      background-color: #4E758D;
+}
+  
+    .navbar {
+      background-color: #f8f9fa; /* Light grey background, change as needed */
+      padding: 10px 15px;
+      margin-bottom: 20px; /* Space below the navbar */
+      border-radius: 5px;
+      box-shadow: 0 2px 4px rgba(0,0,0,.1); /* subtle shadow for depth */
+  }
+  
+  .navbar .button-container {
+      display: flex;
+      gap: 10px; /* Space between buttons */
+  }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -41,6 +70,14 @@
   {% endif %}
   
   {% if not df_empty %}
+  <div class="navbar">
+    <div class="button-container">
+      <!-- Calculate Discounts button -->
+      <!-- Edit Offer button -->
+      <a href="{% url 'admin:offer_email' %}" class="custom-button">Email Offer</a>
+
+    </div>
+  </div>
   <h2>Updated Offered Prices:</h2>
   <table class="table" id="discountedPricesTable">
     <thead>

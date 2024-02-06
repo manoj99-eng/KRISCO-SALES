@@ -15,6 +15,7 @@ from inventory.models import SlowMoversReport
 from .forms import DiscountForm,EditDiscountForm, EditSalonDiscountForm, SalonDiscountForm
 from django.template.defaultfilters import slugify
 from django.http import JsonResponse
+from daterange.filters import DateRangeFilter
 
 logger = logging.getLogger(__name__)
 
@@ -110,16 +111,24 @@ class Weekly_OfferAdmin(admin.ModelAdmin):
             return render(request, 'admin/import_csv.html', context)
 
 
-
 logger = logging.getLogger(__name__)
 @admin.register(BrandOffer)
 class BrandOfferAdmin(admin.ModelAdmin):
-    list_display = ['sku', 'description', 'available', 'cost', 'discount', 'offer_price']
-    list_filter = ['discount']  # Add more fields to filter as needed
-    search_fields = ['sku', 'description']  # Add more fields to search as needed
-
+    list_display = ['date', 'time', 'offer_file','offer_type', 'created_person_first_name', 'created_person_last_name', 'created_person_email', 'reason_for_offer_generation']
+    list_filter = [('date',DateRangeFilter),'offer_type']  # Add more fields to filter as needed
+    search_fields = ['offer_file','created_person_first_name', 'created_person_last_name', 'created_person_email', 'reason_for_offer_generation']  # Add more fields to search as needed
+    
     actions = ['generate_offers']
 
+    def save_saloon(self,request):
+        return render(request,'admin/offers/brandoffer/offer_save_salon.html')
+
+
+    # Email Offers
+    def offer_email(self,request):
+        return render(request,'admin/offers/brandoffer/offer_email.html')
+
+    # Special Brand Offers Salon Views
     def edit_discount_salon_item(self,request, sku):
         response_data = {'success': False, 'message': '', 'data': {}}
         try:
@@ -224,6 +233,22 @@ class BrandOfferAdmin(admin.ModelAdmin):
         # Make sure to use the correct template path
         return render(request, 'admin/offers/brandoffer/offer_generation_salon.html', context)
 
+    @staticmethod
+    def offer_edit_salon(request):
+        # This method needs to be able to handle the request object directly
+        if 'filtered_data_df' in request.session:
+            filtered_data_df_json = request.session['filtered_data_df']
+            df = pd.read_json(StringIO(filtered_data_df_json), orient='split')
+
+            # Prepare your context with the DataFrame
+            context = {'df': df.to_dict(orient='records')}
+            return render(request, 'admin/offers/brandoffer/offer_edit_salon.html', context)
+        else:
+            # If no DataFrame is found in the session, redirect or show an error
+            messages.error(request, "No data found in session.")
+            return redirect('admin:index')  # Adjust the redirect as needed
+
+    # Special Brand Offers Views
     def edit_discount_item(self, request, sku):
         response_data = {'success': False, 'message': '', 'data': {}}
         try:
@@ -317,21 +342,6 @@ class BrandOfferAdmin(admin.ModelAdmin):
         return render(request, 'admin/offers/brandoffer/offer_discount.html', context)
 
     @staticmethod
-    def offer_edit_salon(request):
-        # This method needs to be able to handle the request object directly
-        if 'filtered_data_df' in request.session:
-            filtered_data_df_json = request.session['filtered_data_df']
-            df = pd.read_json(StringIO(filtered_data_df_json), orient='split')
-
-            # Prepare your context with the DataFrame
-            context = {'df': df.to_dict(orient='records')}
-            return render(request, 'admin/offers/brandoffer/offer_edit_salon.html', context)
-        else:
-            # If no DataFrame is found in the session, redirect or show an error
-            messages.error(request, "No data found in session.")
-            return redirect('admin:index')  # Adjust the redirect as needed
-
-    @staticmethod
     def offer_edit(request):
         # This method needs to be able to handle the request object directly
         if 'filtered_data_df' in request.session:
@@ -346,6 +356,7 @@ class BrandOfferAdmin(admin.ModelAdmin):
             messages.error(request, "No data found in session.")
             return redirect('admin:index')  # Adjust the redirect as needed
 
+    # Brand Offers Generation Views
     def generate_offers(self, request, queryset):
         # Retrieve selected filters from session storage
         selected_filters_json = request.session.get('selectedFilters')
@@ -398,6 +409,7 @@ class BrandOfferAdmin(admin.ModelAdmin):
 
     generate_offers.short_description = 'Generate Brand Offers'
 
+    # Paths for Views Handles Brand Offers
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
@@ -413,6 +425,13 @@ class BrandOfferAdmin(admin.ModelAdmin):
             # Correct the paths for editing and removing salon items to match the salon offer editing and removing operations
             path('offer_edit_salon/edit/<str:sku>/', self.admin_site.admin_view(self.edit_discount_salon_item), name='edit_discount_salon_item'),
             path('offer_edit_salon/remove/<str:sku>/', self.admin_site.admin_view(self.remove_discount_salon_item), name='remove_discount_salon_item'),
+            # Email Brand and Salon Offer to Customer 
+            path('offer_email/',self.admin_site.admin_view(self.offer_email),name='offer_email'),
+            # Save Brand Offer Salon
+            path('save_saloon/',self.admin_site.admin_view(self.save_saloon),name='save_salon'),
         ]
         return custom_urls + urls
+    class Media:
+        css = {"all": ("admin/css/forms.css", "css/admin/daterange.css")}
+        js = ("admin/js/calendar.js", "js/admin/DateRangeShortcuts.js")
 
