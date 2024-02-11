@@ -340,12 +340,9 @@ class BrandOfferAdmin(admin.ModelAdmin):
             return redirect('admin:index')  # Adjust the redirect as needed
 
     # Special Brand Offers Views
-        
-
     def save_offer(self,request):
         try:
             current_user = request.user
-
             # Retrieve the latest DataFrame from the session
             filtered_data_df_json = request.session.get('filtered_data_df')
             if not filtered_data_df_json:
