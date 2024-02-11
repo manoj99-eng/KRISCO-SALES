@@ -55,6 +55,7 @@ class SalonDiscountForm(forms.Form):
 
 
 class EditDiscountForm(forms.Form):
+
     description = forms.CharField(
         label='Description',
         max_length=255,
@@ -85,6 +86,7 @@ class EditDiscountForm(forms.Form):
         cleaned_data = super().clean()
         cost = cleaned_data.get('cost')
         discount = cleaned_data.get('discount')
+        
 
         # Calculate offer_price if both cost and discount are provided
         if cost is not None and discount is not None:

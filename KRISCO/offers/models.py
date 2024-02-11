@@ -37,7 +37,15 @@ class Weekly_Offer(models.Model):
             self.offer_price = self.msrp - (self.msrp * (self.discount / Decimal('100.00')))
         super().save(*args, **kwargs)
 
-
+CUSTOMER_RANK_CHOICES = (
+    ('DIAMOND', 'DIAMOND'),
+    ('PLATINUM', 'PLATINUM'),
+    ('GOLD', 'GOLD'),
+    ('SILVER', 'SILVER'),
+    ('BRONZE','BRONZE'),
+    ('IN HOME','INHOME')
+    # Add more choices as needed
+)
 class BrandOffer(models.Model):
     OFFER_TYPE_CHOICES = [
         ('SALON', 'SALON'),
@@ -46,25 +54,12 @@ class BrandOffer(models.Model):
     date = models.DateField()
     time = models.TimeField()
     offer_type = models.CharField(max_length=7, choices=OFFER_TYPE_CHOICES)
-    offer_file = models.FileField()
+    offer_file = models.FileField(upload_to='offers/brandoffer/')
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     created_person_first_name = models.CharField(max_length=255)
     created_person_last_name = models.CharField(max_length=255)
     created_person_email = models.EmailField()
-    reason_for_offer_generation = models.TextField()
-
-    def save(self, *args, **kwargs):
-        if not self.id:  # If this is a new object, not updating
-            # Automatically set created_by to the current user
-            # This assumes you have access to request.user, typically set in your view before calling save()
-            # self.created_by = request.user  # Uncomment and adjust in your actual view logic
-
-            # Automatically populate first_name, last_name, and email from the created_by user
-            self.created_person_first_name = self.created_by.first_name
-            self.created_person_last_name = self.created_by.last_name
-            self.created_person_email = self.created_by.email
-
-        super(BrandOffer, self).save(*args, **kwargs)
+    customer_rank = models.CharField(max_length=50, choices=CUSTOMER_RANK_CHOICES)
 
     def __str__(self):
         return f"{self.created_person_first_name} {self.created_person_last_name}'s Offer on {self.date}"

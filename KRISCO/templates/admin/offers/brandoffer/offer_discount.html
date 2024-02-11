@@ -61,6 +61,7 @@
       <!-- Edit Offer button -->
       <a href="{% url 'admin:admin_offer_edit' %}" class="custom-button">Edit Offer</a>
       <a href="{% url 'admin:offer_email' %}" class="custom-button">Email Offer</a>
+      <a href="{% url 'admin:save_offer' %}" class="custom-button">Save Offer</a>
 
     </div>
   </div>
@@ -118,6 +119,7 @@
         <th>Upc</th>
         <th>Description</th>
         <th>Available</th>
+        <th>Display Qty</th>
         <th>Cost</th>
         <th>Discount</th>
         <th>Offer Price</th>
@@ -131,6 +133,7 @@
         <td>{{ row.upc }}</td>
         <td>{{ row.description }}</td>
         <td>{{ row.available }}</td>
+        <td>{{ row.display_qty }}</td>
         <td>{{ row.cost }}</td>
         <td>{{ row.discount }}</td>
         <td>{{ row.offer_price }}</td>

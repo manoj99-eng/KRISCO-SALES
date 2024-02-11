@@ -60,7 +60,8 @@
       <!-- Calculate Discounts button -->
       <!-- Edit Offer button -->
       <a href="{% url 'admin:admin_offer_salon' %}" class="custom-button">Edit Offer</a>
-      <a href="{% url 'admin:offer_email' %}" class="custom-button">Email Offer</a>
+      <a href="{% url 'admin:offer_email' %}" class="custom-button">Email Salon Offer</a>
+      <a href="{% url 'admin:save_salon' %}" class="custom-button">Save Salon Offer</a>
     </div>
   </div>
   <div class="app-offers model-brandoffer change-form">
@@ -96,6 +97,7 @@
                     <th>Brand</th>
                     <th>Description</th>
                     <th>Available</th>
+                    <th>Display Qty</th>
                     <th>Cost</th>
                     <th>Salon</th>
                     <th>Discount (%)</th>
@@ -109,6 +111,7 @@
                     <td>{{ row.brand }}</td>
                     <td>{{ row.description }}</td>
                     <td>{{ row.available }}</td>
+                    <td>{{ row.display_qty }}</td>
                     <td>{{ row.cost }}</td>
                     <td>{{ row.salon }}</td>
                     <td>{{ row.discount }}</td>

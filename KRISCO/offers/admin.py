@@ -1,21 +1,30 @@
-from io import StringIO
-import json
-from django.urls import path,reverse
-from django.contrib import admin
-from django.shortcuts import render,redirect
-from django.http import HttpResponse, HttpResponseRedirect
-from django.db import transaction
-import pandas as pd
-from .models import Weekly_Offer, BrandOffer
-import csv
-from django.db.models import Q
-import logging
-from django.contrib import messages
-from inventory.models import SlowMoversReport
-from .forms import DiscountForm,EditDiscountForm, EditSalonDiscountForm, SalonDiscountForm
-from django.template.defaultfilters import slugify
-from django.http import JsonResponse
-from daterange.filters import DateRangeFilter
+from io import BytesIO, StringIO  # You already have these for handling in-memory files
+import json  # Existing
+from django.urls import path, reverse  # Existing
+from django.contrib import admin  # Existing
+from django.shortcuts import render, redirect  # Existing
+from django.http import HttpResponse, HttpResponseRedirect, HttpResponseNotFound  # Existing, HttpResponse duplicated
+from django.db import transaction  # Existing
+import pandas as pd  # Existing
+from .models import Weekly_Offer, BrandOffer  # Existing
+import csv  # Existing
+from django.db.models import Q  # Existing
+import logging  # Existing
+from django.contrib import messages  # Existing
+from inventory.models import SlowMoversReport  # Existing
+from .forms import DiscountForm, EditDiscountForm, EditSalonDiscountForm, SalonDiscountForm  # Existing
+from django.template.defaultfilters import slugify  # Existing
+from django.http import JsonResponse  # Existing
+from daterange.filters import DateRangeFilter  # Existing
+from openpyxl.utils import get_column_letter  # Existing
+from openpyxl import Workbook  # Existing, ensure it's used if necessary
+from django.utils import timezone  # Existing
+from django.core.files.base import ContentFile  # Existing
+from django.contrib.auth.decorators import login_required  # For user authentication in views
+from django.contrib.auth.models import User  # If you're referencing the User model directly
+
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -112,17 +121,98 @@ class Weekly_OfferAdmin(admin.ModelAdmin):
 
 
 logger = logging.getLogger(__name__)
+
+
+def as_text(value):
+    if value is None:
+        return ""
+    return str(value)
 @admin.register(BrandOffer)
 class BrandOfferAdmin(admin.ModelAdmin):
-    list_display = ['date', 'time', 'offer_file','offer_type', 'created_person_first_name', 'created_person_last_name', 'created_person_email', 'reason_for_offer_generation']
+    list_display = ['date', 'time', 'offer_file','offer_type', 'created_person_first_name', 'created_person_last_name', 'created_person_email', 'customer_rank']
     list_filter = [('date',DateRangeFilter),'offer_type']  # Add more fields to filter as needed
-    search_fields = ['offer_file','created_person_first_name', 'created_person_last_name', 'created_person_email', 'reason_for_offer_generation']  # Add more fields to search as needed
+    search_fields = ['offer_file','created_person_first_name', 'created_person_last_name', 'created_person_email', 'customer_rank']  # Add more fields to search as needed
     
     actions = ['generate_offers']
 
-    def save_saloon(self,request):
-        return render(request,'admin/offers/brandoffer/offer_save_salon.html')
+    def error_page(request,self):
+        return render(request,'admin/offers/brandoffer/error.html')
 
+    def save_saloon(self,request):
+        try:
+            current_user = request.user
+
+            # Retrieve the latest DataFrame from the session
+            filtered_data_df_json = request.session.get('filtered_data_df')
+            if not filtered_data_df_json:
+                messages.error(request, 'No data found in session.')
+                return HttpResponseRedirect('./')  # Adjust as needed
+
+            # Load DataFrame from JSON
+            df = pd.read_json(filtered_data_df_json, orient='split')
+
+            # Ensure DataFrame is not empty and has required 'brand' column
+            if df.empty or 'brand' not in df.columns:
+                messages.error(request, 'The DataFrame is empty or missing the "brand" column.')
+                return HttpResponseRedirect('./')  # Adjust as needed
+            
+            # Construct file name
+            unique_brands = '_'.join(sorted(df['brand'].unique().tolist()))
+            file_name = f"Krisco_{unique_brands}_{timezone.now().strftime('%Y-%m-%d_%H-%M-%S')}.xlsx"
+            # Drop specific columns and check for existence before dropping to avoid KeyError
+            columns_to_drop = ['id', 'report_date', 'item_classification', 'qtyin_oneyear', 'qtyout_oneyear',
+                            'balance_oneyear', 'available', 'cost','begining_balance', 'reference',
+                            'percentage', 'sellercategory']
+            df.drop(columns=[col for col in columns_to_drop if col in df.columns], inplace=True, errors='ignore')
+
+            # Rename 'display_qty' to 'available' if 'display_qty' exists in DataFrame
+            if 'display_qty' in df.columns:
+                df.rename(columns={'display_qty': 'available'}, inplace=True)
+            if 'salon' in df.columns:
+                df.rename(columns={'salon' : 'cost'},inplace=True)
+
+            # Convert column names to uppercase
+            df.columns = [col.upper() for col in df.columns]
+
+            # Excel file creation
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name='Sheet1')
+                # Get workbook and worksheet for auto-adjusting column widths
+                worksheet = writer.sheets['Sheet1']
+                for column_cells in worksheet.columns:
+                    length = max(len(str(cell.value)) if cell.value is not None else 0 for cell in column_cells) + 2
+                    worksheet.column_dimensions[get_column_letter(column_cells[0].column)].width = length
+                if 'UPC' in df.columns:
+                    upc_col_idx = df.columns.get_loc('UPC') + 1  # +1 because DataFrame columns are 0-indexed but Excel columns are 1-indexed
+                    for row in worksheet.iter_rows(min_col=upc_col_idx, max_col=upc_col_idx, min_row=2, max_row=worksheet.max_row):
+                        for cell in row:
+                            cell.number_format = '000000000000'
+
+            # Prepare the file content for saving to the model's FileField
+            output.seek(0)  # Rewind the buffer
+            file_content = ContentFile(output.read(), name=file_name)
+
+            with transaction.atomic():
+                new_offer = BrandOffer(
+                    date=timezone.now().date(),
+                    time=timezone.now().time(),
+                    offer_type='SALON',
+                    created_by=current_user,
+                    created_person_first_name=current_user.first_name,
+                    created_person_last_name=current_user.last_name,
+                    created_person_email=current_user.email,
+                    customer_rank='DIAMOND'
+                )
+                new_offer.save()
+                new_offer.offer_file.save(file_name, file_content, save=True)
+
+            messages.success(request, 'Offer saved successfully.')
+            return HttpResponseRedirect('/admin/offers/brandoffer/offer_save_salon.html')  # Adjust as needed
+        except Exception as e:
+            logger.error(f"Error saving offer: {e}")
+            messages.error(request, f"Error saving offer: {e}")
+            return HttpResponseRedirect('/admin/offers/brandoffer/error.html')  # Adjust as needed
 
     # Email Offers
     def offer_email(self,request):
@@ -198,6 +288,7 @@ class BrandOfferAdmin(admin.ModelAdmin):
         if filtered_data_df_json:
             df = pd.read_json(StringIO(filtered_data_df_json), orient='split')
             unique_brands = sorted(df['brand'].unique().tolist())
+            df['display_qty'] = df['available']
             df['salon'] = df['cost'] / 2
         else:
             unique_brands = []
@@ -249,6 +340,82 @@ class BrandOfferAdmin(admin.ModelAdmin):
             return redirect('admin:index')  # Adjust the redirect as needed
 
     # Special Brand Offers Views
+        
+
+    def save_offer(self,request):
+        try:
+            current_user = request.user
+
+            # Retrieve the latest DataFrame from the session
+            filtered_data_df_json = request.session.get('filtered_data_df')
+            if not filtered_data_df_json:
+                messages.error(request, 'No data found in session.')
+                return HttpResponseRedirect('./')  # Adjust as needed
+
+            # Load DataFrame from JSON
+            df = pd.read_json(filtered_data_df_json, orient='split')
+
+            # Ensure DataFrame is not empty and has required 'brand' column
+            if df.empty or 'brand' not in df.columns:
+                messages.error(request, 'The DataFrame is empty or missing the "brand" column.')
+                return HttpResponseRedirect('./')  # Adjust as needed
+            
+            # Construct file name
+            unique_brands = '_'.join(sorted(df['brand'].unique().tolist()))
+            file_name = f"Krisco_{unique_brands}_{timezone.now().strftime('%Y-%m-%d_%H-%M-%S')}.xlsx"
+            # Drop specific columns and check for existence before dropping to avoid KeyError
+            columns_to_drop = ['id', 'report_date', 'item_classification', 'qtyin_oneyear', 'qtyout_oneyear',
+                            'balance_oneyear', 'available', 'begining_balance', 'reference',
+                            'percentage', 'sellercategory']
+            df.drop(columns=[col for col in columns_to_drop if col in df.columns], inplace=True, errors='ignore')
+
+            # Rename 'display_qty' to 'available' if 'display_qty' exists in DataFrame
+            if 'display_qty' in df.columns:
+                df.rename(columns={'display_qty': 'available'}, inplace=True)
+
+            # Convert column names to uppercase
+            df.columns = [col.upper() for col in df.columns]
+
+            # Excel file creation
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name='Sheet1')
+                # Get workbook and worksheet for auto-adjusting column widths
+                worksheet = writer.sheets['Sheet1']
+                for column_cells in worksheet.columns:
+                    length = max(len(str(cell.value)) if cell.value is not None else 0 for cell in column_cells) + 2
+                    worksheet.column_dimensions[get_column_letter(column_cells[0].column)].width = length
+                if 'UPC' in df.columns:
+                    upc_col_idx = df.columns.get_loc('UPC') + 1  # +1 because DataFrame columns are 0-indexed but Excel columns are 1-indexed
+                    for row in worksheet.iter_rows(min_col=upc_col_idx, max_col=upc_col_idx, min_row=2, max_row=worksheet.max_row):
+                        for cell in row:
+                            cell.number_format = '000000000000'
+
+            # Prepare the file content for saving to the model's FileField
+            output.seek(0)  # Rewind the buffer
+            file_content = ContentFile(output.read(), name=file_name)
+
+            with transaction.atomic():
+                new_offer = BrandOffer(
+                    date=timezone.now().date(),
+                    time=timezone.now().time(),
+                    offer_type='REGULAR',
+                    created_by=current_user,
+                    created_person_first_name=current_user.first_name,
+                    created_person_last_name=current_user.last_name,
+                    created_person_email=current_user.email,
+                    customer_rank='DIAMOND'
+                )
+                new_offer.save()
+                new_offer.offer_file.save(file_name, file_content, save=True)
+
+            messages.success(request, 'Offer saved successfully.')
+            return HttpResponseRedirect('/admin/offers/brandoffer/offer_save.html')  # Adjust as needed
+        except Exception as e:
+            logger.error(f"Error saving offer: {e}")
+            messages.error(request, f"Error saving offer: {e}")
+            return HttpResponseRedirect('/admin/offers/brandoffer/error.html')  # Adjust as needed
+
     def edit_discount_item(self, request, sku):
         response_data = {'success': False, 'message': '', 'data': {}}
         try:
@@ -309,6 +476,7 @@ class BrandOfferAdmin(admin.ModelAdmin):
         if filtered_data_df_json:
             df = pd.read_json(StringIO(filtered_data_df_json), orient='split')
             unique_brands = sorted(df['brand'].unique().tolist())
+            df['display_qty'] = df['available']
         else:
             unique_brands = []  # Fallback if there's no DataFrame data
 
@@ -413,6 +581,9 @@ class BrandOfferAdmin(admin.ModelAdmin):
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
+            #error page
+            path('error_page/',self.admin_site.admin_view(self.error_page),name='error_page'),
+            #paths
             path('generate_offers/', self.admin_site.admin_view(self.generate_offers), name='generate_offers'),
             path('filter_offers/', self.admin_site.admin_view(self.filter_offers), name='filter_offers'),
             path('offer_discount/', self.admin_site.admin_view(self.offer_discount), name='offer_discount'),
@@ -428,7 +599,8 @@ class BrandOfferAdmin(admin.ModelAdmin):
             # Email Brand and Salon Offer to Customer 
             path('offer_email/',self.admin_site.admin_view(self.offer_email),name='offer_email'),
             # Save Brand Offer Salon
-            path('save_saloon/',self.admin_site.admin_view(self.save_saloon),name='save_salon'),
+            path('save_salon/',self.admin_site.admin_view(self.save_saloon),name='save_salon'),
+            path('save_offer/',self.admin_site.admin_view(self.save_offer), name='save_offer'),
         ]
         return custom_urls + urls
     class Media:

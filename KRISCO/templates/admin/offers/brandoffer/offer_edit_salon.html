@@ -74,7 +74,8 @@
     <div class="button-container">
       <!-- Calculate Discounts button -->
       <!-- Edit Offer button -->
-      <a href="{% url 'admin:offer_email' %}" class="custom-button">Email Offer</a>
+      <a href="{% url 'admin:offer_email' %}" class="custom-button">Email Salon Offer</a>
+      <a href="{% url 'admin:save_salon' %}" class="custom-button">Save Salon Offer</a>
 
     </div>
   </div>
@@ -87,6 +88,7 @@
         <th>Upc</th>
         <th>Description</th>
         <th>Available</th>
+        <th>Display Qty</th>
         <th>Cost</th>
         <th>Salon</th>
         <th>Discount</th>
@@ -103,6 +105,7 @@
         <td>{{ row.upc }}</td>
         <td>{{ row.description }}</td>
         <td>{{ row.available }}</td>
+        <td>{{ row.display_qty }}</td>
         <td>{{ row.cost }}</td>
         <td>{{row.salon}}</td>
         <td>{{ row.discount }}</td>

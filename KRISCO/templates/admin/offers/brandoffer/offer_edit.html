@@ -75,6 +75,7 @@
       <!-- Calculate Discounts button -->
       <!-- Edit Offer button -->
       <a href="{% url 'admin:offer_email' %}" class="custom-button">Email Offer</a>
+      <a href="{% url 'admin:save_offer' %}" class="custom-button">Save Offer</a>
 
     </div>
   </div>
@@ -87,6 +88,7 @@
         <th>Upc</th>
         <th>Description</th>
         <th>Available</th>
+        <th>Display Qty</th>
         <th>Cost</th>
         <th>Discount</th>
         <th>Offer Price</th>
@@ -102,8 +104,9 @@
         <td>{{ row.upc }}</td>
         <td>{{ row.description }}</td>
         <td>{{ row.available }}</td>
+        <td contenteditable='true'>{{ row.display_qty }}</td>
         <td>{{ row.cost }}</td>
-        <td>{{ row.discount }}</td>
+        <td contenteditable='true'>{{ row.discount }}</td>
         <td>{{ row.offer_price }}</td>
         <td>
           <button type="button" class="btn btn-primary edit-item" 
@@ -150,6 +153,10 @@
           <input type="text" class="form-control" id="modal-available" readonly>
         </div>
         <div class="form-group">
+          <label>Display Qty:</label>
+          <input type="text" class="form-control" id="modal-display_qty" >
+        </div>
+        <div class="form-group">
           <label>UPC:</label>
           <input type="text" class="form-control" id="modal-upc" readonly>
         </div>
@@ -159,7 +166,7 @@
         </div>
         <div class="form-group">
           <label for="modal-cost">Cost:</label>
-          <input type="number" class="form-control" id="modal-cost">
+          <input type="number" class="form-control" id="modal-cost" readonly>
         </div>
         <div class="form-group">
           <label for="modal-discount">Discount (%):</label>
@@ -225,6 +232,7 @@
           // Populate modal inputs
           $('#modal-sku').val($(this).data('sku'));
           $('#modal-available').val($(this).data('available'));
+          $('#modal-display_qty').val($(this).data('display_qty'));
           $('#modal-upc').val($(this).data('upc'));
           $('#modal-description').val($(this).data('description'));
           $('#modal-cost').val($(this).data('cost'));
@@ -240,6 +248,7 @@
           const postData = {
               'description': $('#modal-description').val(),
               'cost': $('#modal-cost').val(),
+              'display_qty' : $('#modal-display_qty').val(),
               'discount': $('#modal-discount').val(),
               'offer_price': $('#modal-offer-price').val(),
               'csrfmiddlewaretoken': getCSRFToken(),
