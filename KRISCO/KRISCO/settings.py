@@ -156,3 +156,5 @@ EMAIL_HOST_PASSWORD = 'xkqaqragpyckoagp'
 
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 20000000  # Increase the limit to a suitable value
+
+SESSION_SAVE_EVERY_REQUEST = True

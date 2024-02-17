@@ -1,7 +1,7 @@
 from django import forms
 from django.template.defaultfilters import slugify
-from django.core.validators import MinValueValidator, MaxValueValidator
-
+from customer.models import Customer, CUSTOMER_CATEGORY_CHOICES, CUSTOMER_RANK_CHOICES, CUSTOMER_TYPE_CHOICES
+from customer.models import Customer
 
 class DiscountForm(forms.Form):
     def __init__(self, unique_brands, *args, **kwargs):
@@ -138,3 +138,10 @@ class EditSalonDiscountForm(forms.Form):
             offer_price = salon * (1 - discount / 100)
             cleaned_data['offer_price'] = round(offer_price, 2)  # Round to 2 decimal places
         return cleaned_data
+
+class CustomerFilterForm(forms.Form):
+    customer_rank = forms.MultipleChoiceField(choices=CUSTOMER_RANK_CHOICES, required=False, widget=forms.CheckboxSelectMultiple)
+    customer_type = forms.MultipleChoiceField(choices=CUSTOMER_TYPE_CHOICES, required=False, widget=forms.CheckboxSelectMultiple)
+    customer_category = forms.MultipleChoiceField(choices=CUSTOMER_CATEGORY_CHOICES, required=False, widget=forms.CheckboxSelectMultiple)
+
+

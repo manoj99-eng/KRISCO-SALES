@@ -2,8 +2,8 @@ from io import BytesIO, StringIO  # You already have these for handling in-memor
 import json  # Existing
 from django.urls import path, reverse  # Existing
 from django.contrib import admin  # Existing
-from django.shortcuts import render, redirect  # Existing
-from django.http import HttpResponse, HttpResponseRedirect, HttpResponseNotFound  # Existing, HttpResponse duplicated
+from django.shortcuts import get_object_or_404, render, redirect  # Existing
+from django.http import HttpResponse, HttpResponseNotAllowed, HttpResponseRedirect, HttpResponseNotFound  # Existing, HttpResponse duplicated
 from django.db import transaction  # Existing
 import pandas as pd  # Existing
 from .models import Weekly_Offer, BrandOffer  # Existing
@@ -22,8 +22,12 @@ from django.utils import timezone  # Existing
 from django.core.files.base import ContentFile  # Existing
 from django.contrib.auth.decorators import login_required  # For user authentication in views
 from django.contrib.auth.models import User  # If you're referencing the User model directly
-
-
+from django.views.decorators.http import require_http_methods
+from .forms import CustomerFilterForm
+from customer.models import Customer
+from django.views.decorators.csrf import csrf_exempt
+from django.core.cache import cache
+from django.views.decorators.http import require_POST
 
 
 logger = logging.getLogger(__name__)
@@ -122,7 +126,6 @@ class Weekly_OfferAdmin(admin.ModelAdmin):
 
 logger = logging.getLogger(__name__)
 
-
 def as_text(value):
     if value is None:
         return ""
@@ -213,10 +216,73 @@ class BrandOfferAdmin(admin.ModelAdmin):
             logger.error(f"Error saving offer: {e}")
             messages.error(request, f"Error saving offer: {e}")
             return HttpResponseRedirect('/admin/offers/brandoffer/error.html')  # Adjust as needed
+    
 
-    # Email Offers
-    def offer_email(self,request):
-        return render(request,'admin/offers/brandoffer/offer_email.html')
+    def email_customers(self,request):
+        # Check if the DataFrame is already in the session
+        if 'customers_df' not in request.session:
+            # Fetch all customer records
+            customers = Customer.objects.all().values()
+            # Convert query set to DataFrame
+            df = pd.DataFrame(list(customers))
+            # Store DataFrame in session as JSON
+            request.session['customers_df'] = df.to_json(orient='split')
+
+        # Load the DataFrame from the session
+        df_json = request.session.get('customers_df')
+
+        # Check if the DataFrame is empty
+        if df_json == '[]':
+            # Return an empty list of customers
+            customers_list = []
+        else:
+            # Wrap the JSON string with StringIO before passing it to read_json
+            df = pd.read_json(StringIO(df_json), orient='split')
+
+            # Convert DataFrame to list of dicts to pass to the template
+            customers_list = df.to_dict('records')
+
+        form = CustomerFilterForm()
+
+        # Convert the customer_category column to a list of strings
+        df['customer_category'] = df['customer_category'].apply(lambda x: ','.join(x))
+
+        # Get the unique customer categories
+        customer_categories = df['customer_category'].unique().tolist()
+
+        # Render the template with the customers data
+        return render(request, 'admin/offers/brandoffer/email_customers.html', {'customers': customers_list,'filter_form': form, 'customer_categories': customer_categories})
+
+    def reset_customers_df(self,request):
+        # Fetch all customer records again
+        customers = Customer.objects.all().values()
+        # Convert query set to DataFrame
+        df = pd.DataFrame(list(customers))
+        # Store DataFrame in session as JSON anew
+        request.session['customers_df'] = df.to_json(orient='split')
+
+        # Redirect back to the email_customers page
+        return redirect('admin:email_customers')
+
+
+    def remove_customer(self,request, customer_id):
+        if 'customers_df' in request.session:
+            df_json = request.session.get('customers_df')
+            df = pd.read_json(StringIO(df_json), orient='split')
+
+            # Temporarily remove the record by customer_id from the DataFrame
+            df = df[df['customer_id'] != customer_id]
+
+            # Instead of permanently removing, just update the session DataFrame
+            request.session['customers_df'] = df.to_json(orient='split')
+
+            # Redirect back to the listing page without permanently altering session creation logic
+            return redirect('admin:email_customers')
+
+        else:
+            # Handle the case where there is no DataFrame in the session
+            return redirect('admin:email_customers')  # Redirect or show an error as needed
+
 
     # Special Brand Offers Salon Views
     def edit_discount_salon_item(self,request, sku):
@@ -343,6 +409,7 @@ class BrandOfferAdmin(admin.ModelAdmin):
     def save_offer(self,request):
         try:
             current_user = request.user
+
             # Retrieve the latest DataFrame from the session
             filtered_data_df_json = request.session.get('filtered_data_df')
             if not filtered_data_df_json:
@@ -593,11 +660,16 @@ class BrandOfferAdmin(admin.ModelAdmin):
             # Correct the paths for editing and removing salon items to match the salon offer editing and removing operations
             path('offer_edit_salon/edit/<str:sku>/', self.admin_site.admin_view(self.edit_discount_salon_item), name='edit_discount_salon_item'),
             path('offer_edit_salon/remove/<str:sku>/', self.admin_site.admin_view(self.remove_discount_salon_item), name='remove_discount_salon_item'),
-            # Email Brand and Salon Offer to Customer 
-            path('offer_email/',self.admin_site.admin_view(self.offer_email),name='offer_email'),
             # Save Brand Offer Salon
             path('save_salon/',self.admin_site.admin_view(self.save_saloon),name='save_salon'),
             path('save_offer/',self.admin_site.admin_view(self.save_offer), name='save_offer'),
+            #Load customer Data
+            path('email_customers/reset/', self.admin_site.admin_view(self.reset_customers_df), name='reset_customers_df'),
+
+            # Remove Email
+            path('remove_customer/<str:customer_id>/', self.admin_site.admin_view(self.remove_customer), name='remove_customer'),
+            # Email Brand and Salon Offer to Customer 
+            path('email_customers/',self.admin_site.admin_view(self.email_customers),name='email_customers'),
         ]
         return custom_urls + urls
     class Media:

@@ -66,3 +66,17 @@ class BrandOffer(models.Model):
     class Meta:
         verbose_name = 'Brand Offer'
         verbose_name_plural = 'Brand Offers'
+
+
+class EmailLog(models.Model):
+    recipient_email = models.EmailField()
+    cc_emails = models.TextField(blank=True, help_text="Comma-separated list of CC emails.")
+    bcc_emails = models.TextField(blank=True, help_text="Comma-separated list of BCC emails.")
+    subject = models.CharField(max_length=255)
+    message = models.TextField()
+    sent_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=50, help_text="Success or Failure")
+    error_message = models.TextField(blank=True, help_text="Error message if sending failed.")
+
+    def __str__(self):
+        return f"{self.recipient_email} - {self.subject} - {'Sent' if self.status == 'Success' else 'Failed'}"

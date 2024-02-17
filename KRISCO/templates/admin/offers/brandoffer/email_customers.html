@@ -1,0 +1,160 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}Email Customers{% endblock %}
+
+{% block extrahead %}
+
+{{ block.super }}
+<style>
+.custom-button-1 {
+    display: block;
+    width: fit-content;
+    background-color: #84ADC5;
+    color: #ffffff !important; /* White text color for better contrast */
+    border: none;
+    border-radius: 4px;
+    padding: 10px 20px;
+    cursor: pointer;
+    margin-top: 10px; 
+    /* Adjust the margin as needed */
+}
+/* Hover effect for the button */
+.custom-button-1:hover {
+    background-color: #4E758D;
+}
+         /* Additional custom styles */
+.custom-button {
+    display: block;
+    width: 50%;
+    background-color: #84ADC5;
+    color: #ffffff !important; /* White text color for better contrast */
+    border: none;
+    border-radius: 4px;
+    padding: 10px 20px;
+    cursor: pointer;
+    margin-top: 10px; 
+    /* Adjust the margin as needed */
+}
+    /* Hover effect for the button */
+.custom-button:hover {
+    background-color: #4E758D;
+}
+#filterFormContainer table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#filterFormContainer td {
+    padding: 10px;
+    border: 1px solid #eee; /* Light border for each cell */
+}
+
+#filterFormContainer label {
+    display: block;
+    margin-bottom: 5px;
+}
+
+#filterFormContainer input[type=checkbox] {
+    margin-right: 5px;
+}
+
+#filterFormContainer button {
+    margin-top: 20px;
+}
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a>
+    &rsaquo; Email Customers
+</div>
+{% endblock %}
+
+{% block content %}
+    <div>
+        <h2>Email Customers Data Selection </h2>
+        <div id="filterFormContainer" style="padding: 20px; margin-bottom: 20px;">
+            <form id="filterForm">
+                <table>
+                    <tr>
+                        {% for field in filter_form %}
+                            <td>
+                                {{ field.errors }}
+                                {{ field.label_tag }}<br>
+                                {{ field }}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                </table>
+                <center><button type="button" id="filterButton" class="custom-button">Filter</button></center>
+            </form>
+        </div>
+    </div>
+    <a href="{% url 'admin:reset_customers_df' %}">Reset Customer List</a>
+    <br>        
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Customer ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Customer Mobile</th>
+                    <th>Billing Address</th>
+                    <th>Shipping Address</th>
+                    <th>Customer Handler Name </th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for customer in customers %}
+                <tr class="customerRow" 
+                data-type="{{ customer.customer_type }}" 
+                data-rank="{{ customer.customer_rank }}"
+                data-category="{{ customer.customer_category }}">
+                    <td>{{ customer.customer_id }}</td>
+                    <td>{{ customer.first_name }} {{ customer.last_name }}</td>
+                    <td>{{ customer.email }}</td>
+                    <td>{{customer.mobile_extension}} - {{customer.mobile_number}}</td>
+                    <td>{{ customer.billing_address }}</td>
+                    <td>{{ customer.shipping_address }}</td>
+                    <td>{{customer.handler_first_name}} {{customer.handler_last_name}}</td>
+                    <td>
+                        <a href="{% url 'admin:remove_customer' customer.customer_id %}" class="custom-button-1">Remove</a>
+                    </td>
+                </tr>
+                {% endfor %}                
+            </tbody>
+        </table>
+    </div>
+<script>
+document.getElementById('filterButton').addEventListener('click', function() {
+    var rows = document.querySelectorAll('.customerRow');
+
+    function getCheckedValues(name) {
+        return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(el => el.value);
+    }
+
+    var typeFilters = getCheckedValues('customer_type');
+    var rankFilters = getCheckedValues('customer_rank');
+    var categoryFilters = getCheckedValues('customer_category');
+
+    rows.forEach(function(row) {
+        var type = row.getAttribute('data-type');
+        var rank = row.getAttribute('data-rank');
+        // Parse the category JSON-like string into an array
+        var category = JSON.parse(row.getAttribute('data-category').replace(/'/g, '"')); // Replace single quotes with double quotes for valid JSON
+
+        var typeMatch = typeFilters.length === 0 || typeFilters.includes(type);
+        var rankMatch = rankFilters.length === 0 || rankFilters.includes(rank);
+        // Check if any of the selected category filters is included in the row's categories
+        var categoryMatch = categoryFilters.length === 0 || categoryFilters.some(filter => category.includes(filter));
+
+        console.log('Match status:', typeMatch && rankMatch && categoryMatch); // Debugging line
+
+        row.style.display = (typeMatch && rankMatch && categoryMatch) ? '' : 'none';
+    });
+});
+</script>
+{% endblock %}
+
