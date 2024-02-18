@@ -53,9 +53,12 @@ class SalonDiscountForm(forms.Form):
                     self.add_error(field_name, "Invalid input. Please enter a valid number.")
         return cleaned_data
 
-
 class EditDiscountForm(forms.Form):
 
+    display_qty = forms.IntegerField(
+        label ='Display Qty',
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '1'})
+    )
     description = forms.CharField(
         label='Description',
         max_length=255,
@@ -87,7 +90,6 @@ class EditDiscountForm(forms.Form):
         cost = cleaned_data.get('cost')
         discount = cleaned_data.get('discount')
         
-
         # Calculate offer_price if both cost and discount are provided
         if cost is not None and discount is not None:
             offer_price = cost * (1 - discount / 100)
@@ -96,6 +98,11 @@ class EditDiscountForm(forms.Form):
         return cleaned_data
     
 class EditSalonDiscountForm(forms.Form):
+    
+    display_qty = forms.IntegerField(
+        label ='Display Qty',
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '1'})
+    )
     description = forms.CharField(
         label='Description',
         max_length=255,

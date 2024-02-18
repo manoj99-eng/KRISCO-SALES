@@ -119,6 +119,7 @@
                   data-upc="{{ row.upc }}" 
                   data-description="{{ row.description }}" 
                   data-available="{{ row.available }}" 
+                  data-display_qty="{{row.display_qty}}"
                   data-cost="{{ row.cost }}" 
                   data-salon="{{row.salon}}"
                   data-discount="{{ row.discount }}" 
@@ -154,6 +155,10 @@
         <div class="form-group">
           <label>Available:</label>
           <input type="text" class="form-control" id="modal-available" readonly>
+        </div>
+        <div class="form-group">
+          <label>Display Qty:</label>
+          <input type="number" class="form-control" id="modal-display_qty" >
         </div>
         <div class="form-group">
           <label>UPC:</label>
@@ -235,6 +240,7 @@
           // Populate modal inputs
           $('#modal-sku').val($(this).data('sku'));
           $('#modal-available').val($(this).data('available'));
+          $('#modal-display_qty').val($(this).data('display_qty'));
           $('#modal-upc').val($(this).data('upc'));
           $('#modal-description').val($(this).data('description'));
           $('#modal-cost').val($(this).data('cost'));
@@ -253,6 +259,7 @@
               'cost': $('#modal-cost').val(),
               'salon': $('#modal-salon').val(),
               'discount': $('#modal-discount').val(),
+              'display_qty': $('#modal-display_qty').val(),
               'offer_price': $('#modal-offer-price').val(),
               'csrfmiddlewaretoken': getCSRFToken(),
           };
