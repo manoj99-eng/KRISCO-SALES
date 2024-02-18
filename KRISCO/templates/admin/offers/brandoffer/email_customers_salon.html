@@ -104,9 +104,8 @@
                             <th>Email</th>
                             <th>Customer CC</th>
                             <th>Customer BCC</th>
-                            <th>Billing Address</th>
+                            <th>Customer Company</th>
                             <th>Customer Staff Id </th>
-                            <th>Customer Handler Email</th>
                             <th>Customer Handler Name</th>
                             <th>Action</th>
                         </tr>
@@ -122,9 +121,8 @@
                             <td>{{ customer.email }}</td>
                             <td>{{ customer.customer_cc_email }}</td>
                             <td>{{ customer.customer_bcc_email }}</td>
-                            <td>{{ customer.billing_address }}</td>
+                            <td>{{ customer.customer_company }}</td>
                             <td>{{customer.staff_id}}</td>
-                            <td>{{customer.staff_email}}</td>
                             <td>{{customer.staff_first_name}} {{customer.staff_last_name}}</td>
                             <td>
                                 <a href="{% url 'admin:remove_customer_salon' customer.customer_id %}" class="custom-button-1">Remove</a>
