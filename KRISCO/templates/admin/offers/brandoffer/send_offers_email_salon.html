@@ -1,0 +1,73 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}Email Customers{% endblock %}
+
+{% block extrahead %}
+<style>
+.custom-button {
+    display: block;
+    width: 50%;
+    background-color: #84ADC5;
+    color: #ffffff !important; /* White text color for better contrast */
+    border: none;
+    border-radius: 4px;
+    padding: 10px 20px;
+    cursor: pointer;
+    margin-top: 10px; 
+    /* Adjust the margin as needed */
+}
+    /* Hover effect for the button */
+.custom-button:hover {
+    background-color: #4E758D;
+}
+</style>
+{{ block.super }}
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a>
+    &rsaquo; Email Customers
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Customer ID</th>
+                        <th>Customer Name</th>
+                        <th>Email</th>
+                        <th>Customer CC</th>
+                        <th>Customer BCC</th>
+                        <th>Billing Address</th>
+                        <th>Customer Staff Id </th>
+                        <th>Customer Handler Email</th>
+                        <th>Customer Handler Name</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for customer in customers %}
+                    <tr class="customerRow" 
+                    data-type="{{ customer.customer_type }}" 
+                    data-rank="{{ customer.customer_rank }}"
+                    data-category="{{ customer.customer_category }}">
+                        <td>{{ customer.customer_id }}</td>
+                        <td>{{ customer.first_name }}  {{ customer.last_name }}</td>
+                        <td>{{ customer.email }}</td>
+                        <td>{{ customer.customer_cc_email }}</td>
+                        <td>{{ customer.customer_bcc_email }}</td>
+                        <td>{{ customer.billing_address }}</td>
+                        <td>{{customer.staff_id}}</td>
+                        <td>{{customer.staff_email}}</td>
+                        <td>{{customer.staff_first_name}} {{customer.staff_last_name}}</td>
+                    </tr>
+                    {% endfor %}                
+                </tbody>
+        </table>
+        <center><a href="{% url 'admin:commit_send_emails_salon' %}" class="custom-button">Send Emails</a></center>
+    </div>
+</div>
+{% endblock %}

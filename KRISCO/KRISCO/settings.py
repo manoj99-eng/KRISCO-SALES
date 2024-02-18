@@ -84,7 +84,7 @@ WSGI_APPLICATION = 'KRISCO.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'krisco',
+        'NAME': 'krisco_sales',
         'USER': 'root',
         'PASSWORD': 'manojroot',
         'HOST': 'localhost',
@@ -120,7 +120,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'EST'
+TIME_ZONE = 'UTC'
 
 USE_I18N = True
 
@@ -152,6 +152,12 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'mrbitbyte99@gmail.com'
 EMAIL_HOST_PASSWORD = 'xkqaqragpyckoagp'
+
+EMAIL_HOST_1 = 'smtp.gmail.com'
+EMAIL_PORT_1 = 587
+EMAIL_USE_TLS_1 = True
+EMAIL_HOST_USER_1 = 'tallurutejaswi@gmail.com'
+EMAIL_HOST_PASSWORD_1 = 'ocaocwdfydzvuvne'
 
 
 

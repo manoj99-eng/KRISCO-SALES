@@ -73,6 +73,7 @@ class EmailLog(models.Model):
     cc_emails = models.TextField(blank=True, help_text="Comma-separated list of CC emails.")
     bcc_emails = models.TextField(blank=True, help_text="Comma-separated list of BCC emails.")
     subject = models.CharField(max_length=255)
+    sent_attachment = models.CharField(max_length=255)
     message = models.TextField()
     sent_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=50, help_text="Success or Failure")

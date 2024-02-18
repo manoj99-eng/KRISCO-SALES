@@ -94,7 +94,7 @@
     </div>
     <br>        
         <div class="container-fluid">
-            <a href="{% url 'admin:reset_customers_df' %}">Reset Customer List</a>
+            <a href="{% url 'admin:reset_customers_df_salon' %}">Reset Customer List</a>
             <div class="table-responsive">
                 <table class="table">
                     <thead>
@@ -127,14 +127,14 @@
                             <td>{{customer.staff_email}}</td>
                             <td>{{customer.staff_first_name}} {{customer.staff_last_name}}</td>
                             <td>
-                                <a href="{% url 'admin:remove_customer' customer.customer_id %}" class="custom-button-1">Remove</a>
+                                <a href="{% url 'admin:remove_customer_salon' customer.customer_id %}" class="custom-button-1">Remove</a>
                             </td>
                         </tr>
                         {% endfor %}                
                     </tbody>
                 </table>
             </div>
-           <center><a href="{% url 'admin:send_email_customers' %}" class="custom-button">Finalize Reciepnt List</a></center>
+           <center><a href="{% url 'admin:send_email_customers_salon' %}" class="custom-button">Finalize Reciepnt List</a></center>
         </div>
     </div>
 <script>

@@ -5,8 +5,9 @@ from django.contrib import admin  # Existing
 from django.shortcuts import get_object_or_404, render, redirect  # Existing
 from django.http import HttpResponse, HttpResponseNotAllowed, HttpResponseRedirect, HttpResponseNotFound  # Existing, HttpResponse duplicated
 from django.db import transaction  # Existing
-import pandas as pd  # Existing
-from .models import Weekly_Offer, BrandOffer  # Existing
+import pandas as pd
+from staff.models import StaffEmailConfiguration  # Existing
+from .models import EmailLog, Weekly_Offer, BrandOffer  # Existing
 import csv  # Existing
 from django.db.models import Q  # Existing
 import logging  # Existing
@@ -28,6 +29,23 @@ from customer.models import Customer
 from django.views.decorators.csrf import csrf_exempt
 from django.core.cache import cache
 from django.views.decorators.http import require_POST
+from django.core.mail import EmailMessage, get_connection
+
+@admin.register(EmailLog)
+class EmailLogAdmin(admin.ModelAdmin):
+    list_display = ('recipient_email', 'subject', 'sent_attachment','status', 'sent_at', 'error_message')
+    list_filter = ('status', 'sent_at')
+    search_fields = ('recipient_email', 'subject', 'message')
+    date_hierarchy = 'sent_at'
+    readonly_fields = ('sent_at',)  # Makes the sent_at field read-only in the admin detail view
+
+    def has_add_permission(self, request):
+        # Optional: Disable the ability to add new logs via admin
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        # Optional: Disable the ability to delete logs via admin
+        return False
 
 
 logger = logging.getLogger(__name__)
@@ -138,9 +156,18 @@ class BrandOfferAdmin(admin.ModelAdmin):
     
     actions = ['generate_offers']
 
-    def error_page(request,self):
+    def error(self,request):
         return render(request,'admin/offers/brandoffer/error.html')
+    
+    def success(self,request):
+        return render(request, 'admin/offers/brandoffer/success.html')
+    
 
+
+
+
+    # Offer File Save Salon by Clicking the save salon button.
+    
     def save_saloon(self,request):
         try:
             current_user = request.user
@@ -172,7 +199,7 @@ class BrandOfferAdmin(admin.ModelAdmin):
             if 'display_qty' in df.columns:
                 df.rename(columns={'display_qty': 'available'}, inplace=True)
             if 'salon' in df.columns:
-                df.rename(columns={'salon' : 'cost'},inplace=True)
+                df.rename(columns={'salon' : 'cost'}, inplace=True)
 
             # Convert column names to uppercase
             df.columns = [col.upper() for col in df.columns]
@@ -211,78 +238,236 @@ class BrandOfferAdmin(admin.ModelAdmin):
                 new_offer.offer_file.save(file_name, file_content, save=True)
 
             messages.success(request, 'Offer saved successfully.')
-            return HttpResponseRedirect('/admin/offers/brandoffer/offer_save_salon.html')  # Adjust as needed
+            return redirect('admin:index')  # Adjust as needed
         except Exception as e:
             logger.error(f"Error saving offer: {e}")
             messages.error(request, f"Error saving offer: {e}")
-            return HttpResponseRedirect('/admin/offers/brandoffer/error.html')  # Adjust as needed
+            return HttpResponseRedirect('admin:error')  # Adjust as needed
     
+    # Offer File Save Salon by function call for email attachment.
 
-    def email_customers(self,request):
+    def save_offer_without_redirect_salon(self,request):
+        try:
+            current_user = request.user
+            # Check if the DataFrame exists in the session
+            filtered_data_df_json = request.session.get('filtered_data_df', '')
+            if not filtered_data_df_json:
+                messages.error(request, 'No data found in session.')
+                return HttpResponse('No data found in session.')
+
+            # Load the DataFrame from JSON
+            df = pd.read_json(StringIO(filtered_data_df_json), orient='split')
+
+            if df.empty or 'brand' not in df.columns:
+                messages.error(request, 'The DataFrame is empty or missing the "brand" column.')
+                return HttpResponse('The DataFrame is empty or missing the "brand" column.')
+
+            # Processing steps
+            unique_brands = '_'.join(sorted(df['brand'].unique().tolist()))
+            file_name = f"Krisco_{unique_brands}_{timezone.now().strftime('%Y-%m-%d_%H-%M-%S')}.xlsx"
+
+            # Drop specified columns if they exist to avoid KeyError
+            columns_to_drop = ['id', 'report_date', 'item_classification', 'qtyin_oneyear', 'qtyout_oneyear',
+                            'balance_oneyear', 'available', 'cost','begining_balance', 'reference',
+                            'percentage', 'sellercategory']
+            df.drop(columns=[col for col in columns_to_drop if col in df.columns], inplace=True, errors='ignore')
+
+            # Rename 'display_qty' to 'available' if 'display_qty' exists in DataFrame
+            if 'display_qty' in df.columns:
+                df.rename(columns={'display_qty': 'available'}, inplace=True)
+            if 'salon' in df.columns:
+                df.rename(columns={'salon' : 'cost'},inplace=True)
+
+            # Convert column names to uppercase
+            df.columns = [col.upper() for col in df.columns]
+
+            # Create Excel file
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name='Sheet1')
+
+                # Adjusting column widths
+                worksheet = writer.sheets['Sheet1']
+                for column_cells in worksheet.columns:
+                    length = max(len(str(cell.value)) if cell.value is not None else 0 for cell in column_cells) + 2
+                    worksheet.column_dimensions[get_column_letter(column_cells[0].column)].width = length
+
+                # Formatting for UPC column
+                if 'UPC' in df.columns:
+                    upc_col_idx = df.columns.get_loc('UPC') + 1  # +1 for Excel's 1-indexing
+                    for row in worksheet.iter_rows(min_col=upc_col_idx, max_col=upc_col_idx, min_row=2, max_row=worksheet.max_row + 1):
+                        for cell in row:
+                            cell.number_format = '000000000000'
+
+            # Saving the file to the model's FileField
+            output.seek(0)
+            file_content = ContentFile(output.read(), name=file_name)
+
+            # Database transaction
+            with transaction.atomic():
+                new_offer = BrandOffer(
+                    date=timezone.now().date(),
+                    time=timezone.now().time(),
+                    offer_type='SALON',
+                    created_by=current_user,
+                    created_person_first_name=current_user.first_name,
+                    created_person_last_name=current_user.last_name,
+                    created_person_email=current_user.email,
+                    customer_rank='DIAMOND'
+                )
+                new_offer.save()
+                new_offer.offer_file.save(file_name, file_content, save=True)
+
+            messages.success(request, 'Offer saved successfully.')
+            return new_offer
+        except Exception as e:
+            messages.error(request, f"Error saving offer: {e}")
+            return HttpResponse(f"Error saving offer: {e}")
+
+    def commit_send_emails_salon(self, request):
+        brand_offer_instance = self.save_offer_without_redirect_salon(request)
+        if brand_offer_instance and hasattr(brand_offer_instance, 'offer_file'):
+            file_path = brand_offer_instance.offer_file.path
+            
+            if 'customers_df' in request.session:
+                customers_df_json = request.session['customers_df']
+                df = pd.read_json(StringIO(customers_df_json), orient='split')
+                
+                # Initialize a flag to track overall success
+                all_emails_sent_successfully = True
+
+                for index, row in df.iterrows():
+                    staff_config = StaffEmailConfiguration.objects.filter(staff_id=row['staff_id']).first()
+                    if not staff_config:
+                        messages.error(request, f"No email configuration found for staff ID {row['staff_id']}.")
+                        all_emails_sent_successfully = False
+                        continue  # Proceed to the next iteration
+
+                    try:
+                        connection = get_connection(
+                            host=staff_config.host,
+                            port=staff_config.port,
+                            username=staff_config.username,
+                            password=staff_config.password,
+                            use_tls=staff_config.use_tls
+                        )
+
+                        email = EmailMessage(
+                            "OFFER AUTOMATED EMAIL FROM KRISCO TEAM",
+                            "Hi please find the attached copy of the offer file.",
+                            staff_config.username,
+                            [row['email']],
+                            connection=connection
+                        )
+                        email.attach_file(file_path)
+                        email.send()
+
+                        EmailLog.objects.create(
+                            recipient_email=row['email'],
+                            subject="OFFER AUTOMATED EMAIL FROM KRISCO TEAM",
+                            message="Hi please find the attached copy of the offer file.",
+                            status='Success',
+                            error_message=''
+                        )
+                    except Exception as e:
+                        EmailLog.objects.create(
+                            recipient_email=row['email'],
+                            subject="OFFER AUTOMATED EMAIL FROM KRISCO TEAM",
+                            message="Hi please find the attached copy of the offer file.",
+                            status='Failure',
+                            error_message=str(e)
+                        )
+                        messages.error(request, f"Failed to send email to {row['email']}: {str(e)}")
+                        all_emails_sent_successfully = False  # Mark the flag as false
+
+                # Decide what to do after attempting to send all emails
+                if all_emails_sent_successfully:
+                    messages.success(request, 'All emails sent successfully.')
+                    return redirect('admin:success')
+                else:
+                    messages.error(request, 'Some emails failed to send.')
+                    return redirect(reverse('admin:error'))
+        else:
+            messages.error(request, 'Failed to get the brand offer instance or its file path.')
+            return redirect(reverse('admin:error'))
+
+        # Fallback response if none of the above conditions are met
+        return render(request,'admin/offers/brandoffer/send_offers_email_salon.html')
+
+    def send_email_customers_salon(self, request, *args, **kwargs):
+        if 'customers_df' in request.session:
+            customers_df_json = request.session['customers_df']
+            df = pd.read_json(StringIO(customers_df_json), orient='split')
+            # Fetch staff details only if DataFrame is not empty
+            staff_configs = StaffEmailConfiguration.objects.in_bulk(field_name='staff_id')
+            # Add staff details to the DataFrame
+            df['staff_first_name'] = df['staff_id'].apply(lambda x: staff_configs.get(x).first_name if x in staff_configs else '')
+            df['staff_last_name'] = df['staff_id'].apply(lambda x: staff_configs.get(x).last_name if x in staff_configs else '')
+            df['staff_email'] = df['staff_id'].apply(lambda x: staff_configs.get(x).username if x in staff_configs else '')
+
+            df['customer_category'] = df['customer_category'].apply(lambda x: json.dumps(x) if isinstance(x, list) else x)
+
+            # Convert DataFrame to list of dicts to pass to the template
+            context = {'customers': df.to_dict(orient='records')}
+            return render(request, 'admin/offers/brandoffer/send_offers_email_salon.html', context)
+        else:
+            messages.error(request, "No customer data found in session.")
+            return redirect('admin:index')
+
+    def email_customers_salon(self, request):
         # Check if the DataFrame is already in the session
         if 'customers_df' not in request.session:
-            # Fetch all customer records
             customers = Customer.objects.all().values()
-            # Convert query set to DataFrame
             df = pd.DataFrame(list(customers))
-            # Store DataFrame in session as JSON
             request.session['customers_df'] = df.to_json(orient='split')
 
-        # Load the DataFrame from the session
         df_json = request.session.get('customers_df')
 
-        # Check if the DataFrame is empty
         if df_json == '[]':
-            # Return an empty list of customers
             customers_list = []
         else:
-            # Wrap the JSON string with StringIO before passing it to read_json
             df = pd.read_json(StringIO(df_json), orient='split')
+
+            # Fetch staff details only if DataFrame is not empty
+            staff_configs = StaffEmailConfiguration.objects.in_bulk(field_name='staff_id')
+            # Add staff details to the DataFrame
+            df['staff_first_name'] = df['staff_id'].apply(lambda x: staff_configs.get(x).first_name if x in staff_configs else '')
+            df['staff_last_name'] = df['staff_id'].apply(lambda x: staff_configs.get(x).last_name if x in staff_configs else '')
+            df['staff_email'] = df['staff_id'].apply(lambda x: staff_configs.get(x).username if x in staff_configs else '')
+
+            # Convert the customer_category column to a list of strings
+            df['customer_category'] = df['customer_category'].apply(lambda x: json.dumps(x) if isinstance(x, list) else x)
 
             # Convert DataFrame to list of dicts to pass to the template
             customers_list = df.to_dict('records')
 
+            # Get the unique customer categories
+            customer_categories = df['customer_category'].unique().tolist()
+
         form = CustomerFilterForm()
 
-        # Convert the customer_category column to a list of strings
-        df['customer_category'] = df['customer_category'].apply(lambda x: ','.join(x))
+        return render(request, 'admin/offers/brandoffer/email_customers_salon.html', {
+            'customers': customers_list,
+            'filter_form': form,
+            'customer_categories': customer_categories
+        })
 
-        # Get the unique customer categories
-        customer_categories = df['customer_category'].unique().tolist()
-
-        # Render the template with the customers data
-        return render(request, 'admin/offers/brandoffer/email_customers.html', {'customers': customers_list,'filter_form': form, 'customer_categories': customer_categories})
-
-    def reset_customers_df(self,request):
-        # Fetch all customer records again
+    def reset_customers_df_salon(self,request):
         customers = Customer.objects.all().values()
-        # Convert query set to DataFrame
         df = pd.DataFrame(list(customers))
-        # Store DataFrame in session as JSON anew
         request.session['customers_df'] = df.to_json(orient='split')
+        return redirect('admin:email_customers_salon')
 
-        # Redirect back to the email_customers page
-        return redirect('admin:email_customers')
-
-
-    def remove_customer(self,request, customer_id):
+    def remove_customer_salon(self,request, customer_id):
         if 'customers_df' in request.session:
             df_json = request.session.get('customers_df')
             df = pd.read_json(StringIO(df_json), orient='split')
-
-            # Temporarily remove the record by customer_id from the DataFrame
             df = df[df['customer_id'] != customer_id]
-
-            # Instead of permanently removing, just update the session DataFrame
             request.session['customers_df'] = df.to_json(orient='split')
-
-            # Redirect back to the listing page without permanently altering session creation logic
-            return redirect('admin:email_customers')
+            return redirect('admin:email_customers_salon')
 
         else:
-            # Handle the case where there is no DataFrame in the session
-            return redirect('admin:email_customers')  # Redirect or show an error as needed
-
+            return redirect('admin:email_customers_salon')
 
     # Special Brand Offers Salon Views
     def edit_discount_salon_item(self,request, sku):
@@ -405,6 +590,281 @@ class BrandOfferAdmin(admin.ModelAdmin):
             messages.error(request, "No data found in session.")
             return redirect('admin:index')  # Adjust the redirect as needed
 
+#=======================================SALON ALL CODES ABOVE=========================================
+    
+
+
+
+
+
+
+
+
+
+
+#========================Brand Offer Intial Generation and Filtering=====================
+    # Brand Offers Generation Views
+    def generate_offers(self, request, queryset):
+        # Retrieve selected filters from session storage
+        selected_filters_json = request.session.get('selectedFilters')
+        selected_filters = json.loads(selected_filters_json) if selected_filters_json else {}
+
+        value = SlowMoversReport.objects.all()
+        unique_brands = sorted(set(record.brand for record in value))
+        unique_sellercategories = sorted(set(record.sellercategory for record in value))
+
+        # Store selected brands in session
+        selected_filters['selected_brands'] = request.POST.getlist('brand', [])
+        request.session['selectedFilters'] = json.dumps(selected_filters)
+
+        return render(request, 'admin/offers/brandoffer/offer_generation.html', {'unique_brands': unique_brands, 'unique_sellercategories': unique_sellercategories, 'selected_filters': selected_filters})
+
+    def filter_offers(self, request, queryset=None):
+            if request.method == 'POST':
+                sellercategory = request.POST.getlist('sellercategory', [])
+                brands = request.POST.getlist('brand', [])
+
+                # Create a list to hold the brand filters
+                brand_filters = []
+
+                # Loop through selected brands and create a Q object for each
+                for selected_brand in brands:
+                    brand_filter = Q(brand__startswith=selected_brand)
+                    brand_filters.append(brand_filter)
+
+                # Combine the brand filters using the | operator
+                combined_brand_filters = Q()
+                for brand_filter in brand_filters:
+                    combined_brand_filters |= brand_filter
+
+                # Filter records based on user input and exclude records where 'available' is 0
+                filtered_data = SlowMoversReport.objects.filter(
+                    Q(sellercategory__in=sellercategory),
+                    combined_brand_filters,
+                    available__gt=0  # Greater than 0
+                )
+
+                # Create a DataFrame 'df' from the 'filtered_data'
+                df = pd.DataFrame(list(filtered_data.values()))
+                # Store the DataFrame in the session
+                request.session['filtered_data_df'] = df.to_json(orient='split')
+
+                # Render the filtered data in a new template
+                return render(request, 'admin/offers/brandoffer/filtered_data.html', {'filtered_data': filtered_data})
+
+            return render(request, 'admin/offers/brandoffer/offer_generation.html', {'value': queryset})
+
+#======================================Regular Offer Views Starts====================================
+    
+    def commit_send_emails(self, request):
+        brand_offer_instance = self.save_offer_without_redirect(request)
+        if brand_offer_instance and hasattr(brand_offer_instance, 'offer_file'):
+            file_path = brand_offer_instance.offer_file.path
+            
+            if 'customers_df' in request.session:
+                customers_df_json = request.session['customers_df']
+                df = pd.read_json(StringIO(customers_df_json), orient='split')
+                
+                # Initialize a flag to track overall success
+                all_emails_sent_successfully = True
+
+                for index, row in df.iterrows():
+                    staff_config = StaffEmailConfiguration.objects.filter(staff_id=row['staff_id']).first()
+                    if not staff_config:
+                        messages.error(request, f"No email configuration found for staff ID {row['staff_id']}.")
+                        all_emails_sent_successfully = False
+                        continue  # Proceed to the next iteration
+
+                    try:
+                        connection = get_connection(
+                            host=staff_config.host,
+                            port=staff_config.port,
+                            username=staff_config.username,
+                            password=staff_config.password,
+                            use_tls=staff_config.use_tls
+                        )
+
+                        email = EmailMessage(
+                            "OFFER AUTOMATED EMAIL FROM KRISCO TEAM",
+                            "Hi please find the attached copy of the offer file.",
+                            staff_config.username,
+                            [row['email']],
+                            connection=connection
+                        )
+                        email.attach_file(file_path)
+                        email.send()
+
+                        EmailLog.objects.create(
+                            recipient_email=row['email'],
+                            subject="OFFER AUTOMATED EMAIL FROM KRISCO TEAM",
+                            message="Hi please find the attached copy of the offer file.",
+                            status='Success',
+                            error_message=''
+                        )
+                    except Exception as e:
+                        EmailLog.objects.create(
+                            recipient_email=row['email'],
+                            subject="OFFER AUTOMATED EMAIL FROM KRISCO TEAM",
+                            message="Hi please find the attached copy of the offer file.",
+                            status='Failure',
+                            error_message=str(e)
+                        )
+                        messages.error(request, f"Failed to send email to {row['email']}: {str(e)}")
+                        all_emails_sent_successfully = False  # Mark the flag as false
+
+                # Decide what to do after attempting to send all emails
+                if all_emails_sent_successfully:
+                    messages.success(request, 'All emails sent successfully.')
+                    return redirect('admin:success')
+                else:
+                    messages.error(request, 'Some emails failed to send.')
+                    return redirect(reverse('admin:error'))
+        else:
+            messages.error(request, 'Failed to get the brand offer instance or its file path.')
+            return redirect(reverse('admin:error'))
+
+        # Fallback response if none of the above conditions are met
+        return render(request,'admin/offers/brandoffer/send_offers_email.html')
+    
+
+  
+    def save_offer_without_redirect(self,request):
+        try:
+            current_user = request.user
+            # Check if the DataFrame exists in the session
+            filtered_data_df_json = request.session.get('filtered_data_df', '')
+            if not filtered_data_df_json:
+                messages.error(request, 'No data found in session.')
+                return HttpResponse('No data found in session.')
+
+            # Load the DataFrame from JSON
+            df = pd.read_json(StringIO(filtered_data_df_json), orient='split')
+
+            if df.empty or 'brand' not in df.columns:
+                messages.error(request, 'The DataFrame is empty or missing the "brand" column.')
+                return HttpResponse('The DataFrame is empty or missing the "brand" column.')
+
+            # Processing steps
+            unique_brands = '_'.join(sorted(df['brand'].unique().tolist()))
+            file_name = f"Krisco_{unique_brands}_{timezone.now().strftime('%Y-%m-%d_%H-%M-%S')}.xlsx"
+
+            # Drop specified columns if they exist to avoid KeyError
+            columns_to_drop = ['id', 'report_date', 'item_classification', 'qtyin_oneyear', 'qtyout_oneyear',
+                            'balance_oneyear', 'available', 'begining_balance', 'reference',
+                            'percentage', 'sellercategory']
+            df.drop(columns=[col for col in columns_to_drop if col in df.columns], inplace=True, errors='ignore')
+
+            # Rename column if exists
+            if 'display_qty' in df.columns:
+                df.rename(columns={'display_qty': 'available'}, inplace=True)
+
+            # Convert column names to uppercase
+            df.columns = [col.upper() for col in df.columns]
+
+            # Create Excel file
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name='Sheet1')
+
+                # Adjusting column widths
+                worksheet = writer.sheets['Sheet1']
+                for column_cells in worksheet.columns:
+                    length = max(len(str(cell.value)) if cell.value is not None else 0 for cell in column_cells) + 2
+                    worksheet.column_dimensions[get_column_letter(column_cells[0].column)].width = length
+
+                # Formatting for UPC column
+                if 'UPC' in df.columns:
+                    upc_col_idx = df.columns.get_loc('UPC') + 1  # +1 for Excel's 1-indexing
+                    for row in worksheet.iter_rows(min_col=upc_col_idx, max_col=upc_col_idx, min_row=2, max_row=worksheet.max_row + 1):
+                        for cell in row:
+                            cell.number_format = '000000000000'
+
+            # Saving the file to the model's FileField
+            output.seek(0)
+            file_content = ContentFile(output.read(), name=file_name)
+
+            # Database transaction
+            with transaction.atomic():
+                new_offer = BrandOffer(
+                    date=timezone.now().date(),
+                    time=timezone.now().time(),
+                    offer_type='REGULAR',
+                    created_by=current_user,
+                    created_person_first_name=current_user.first_name,
+                    created_person_last_name=current_user.last_name,
+                    created_person_email=current_user.email,
+                    customer_rank='DIAMOND'
+                )
+                new_offer.save()
+                new_offer.offer_file.save(file_name, file_content, save=True)
+
+            messages.success(request, 'Offer saved successfully.')
+            return new_offer
+        except Exception as e:
+            messages.error(request, f"Error saving offer: {e}")
+            return HttpResponse(f"Error saving offer: {e}")
+
+    def send_email_customers(self, request, *args, **kwargs):
+        if 'customers_df' in request.session:
+            customers_df_json = request.session['customers_df']
+            df = pd.read_json(StringIO(customers_df_json), orient='split')
+            # Fetch staff details only if DataFrame is not empty
+            staff_configs = StaffEmailConfiguration.objects.in_bulk(field_name='staff_id')
+            # Add staff details to the DataFrame
+            df['staff_first_name'] = df['staff_id'].apply(lambda x: staff_configs.get(x).first_name if x in staff_configs else '')
+            df['staff_last_name'] = df['staff_id'].apply(lambda x: staff_configs.get(x).last_name if x in staff_configs else '')
+            df['staff_email'] = df['staff_id'].apply(lambda x: staff_configs.get(x).username if x in staff_configs else '')
+
+            df['customer_category'] = df['customer_category'].apply(lambda x: json.dumps(x) if isinstance(x, list) else x)
+
+            # Convert DataFrame to list of dicts to pass to the template
+            context = {'customers': df.to_dict(orient='records')}
+            return render(request, 'admin/offers/brandoffer/send_offers_email.html', context)
+        else:
+            messages.error(request, "No customer data found in session.")
+            return redirect('admin:index')
+    
+
+    def email_customers(self, request):
+        if 'customers_df' not in request.session:
+            customers = Customer.objects.all().values()
+            df = pd.DataFrame(list(customers))
+            request.session['customers_df'] = df.to_json(orient='split')
+        df_json = request.session.get('customers_df')
+
+        if df_json == '[]':
+            customers_list = []
+        else:
+            df = pd.read_json(StringIO(df_json), orient='split')
+            staff_configs = StaffEmailConfiguration.objects.in_bulk(field_name='staff_id')
+            df['staff_first_name'] = df['staff_id'].apply(lambda x: staff_configs.get(x).first_name if x in staff_configs else '')
+            df['staff_last_name'] = df['staff_id'].apply(lambda x: staff_configs.get(x).last_name if x in staff_configs else '')
+            df['staff_email'] = df['staff_id'].apply(lambda x: staff_configs.get(x).username if x in staff_configs else '')
+            df['customer_category'] = df['customer_category'].apply(lambda x: json.dumps(x) if isinstance(x, list) else x)
+            customers_list = df.to_dict('records')
+            customer_categories = df['customer_category'].unique().tolist()
+
+        form = CustomerFilterForm()
+
+        return render(request, 'admin/offers/brandoffer/email_customers.html', {
+            'customers': customers_list,
+            'filter_form': form,
+            'customer_categories': customer_categories
+        })
+
+    def reset_customers_df(self,request):
+        customers = Customer.objects.all().values()
+        df = pd.DataFrame(list(customers))
+        request.session['customers_df'] = df.to_json(orient='split')
+        return redirect('admin:email_customers')
+
+    def remove_customer(self,request, customer_id):
+        if 'customers_df' in request.session:
+            df_json = request.session.get('customers_df')
+            df = pd.read_json(StringIO(df_json), orient='split')
+            df = df[df['customer_id'] != customer_id]
+            request.session['customers_df'] = df.to_json(orient='split')
+            return redirect('admin:email_customers')
     # Special Brand Offers Views
     def save_offer(self,request):
         try:
@@ -588,56 +1048,8 @@ class BrandOfferAdmin(admin.ModelAdmin):
             messages.error(request, "No data found in session.")
             return redirect('admin:index')  # Adjust the redirect as needed
 
-    # Brand Offers Generation Views
-    def generate_offers(self, request, queryset):
-        # Retrieve selected filters from session storage
-        selected_filters_json = request.session.get('selectedFilters')
-        selected_filters = json.loads(selected_filters_json) if selected_filters_json else {}
 
-        value = SlowMoversReport.objects.all()
-        unique_brands = sorted(set(record.brand for record in value))
-        unique_sellercategories = sorted(set(record.sellercategory for record in value))
-
-        # Store selected brands in session
-        selected_filters['selected_brands'] = request.POST.getlist('brand', [])
-        request.session['selectedFilters'] = json.dumps(selected_filters)
-
-        return render(request, 'admin/offers/brandoffer/offer_generation.html', {'unique_brands': unique_brands, 'unique_sellercategories': unique_sellercategories, 'selected_filters': selected_filters})
-
-    def filter_offers(self, request, queryset=None):
-            if request.method == 'POST':
-                sellercategory = request.POST.getlist('sellercategory', [])
-                brands = request.POST.getlist('brand', [])
-
-                # Create a list to hold the brand filters
-                brand_filters = []
-
-                # Loop through selected brands and create a Q object for each
-                for selected_brand in brands:
-                    brand_filter = Q(brand__startswith=selected_brand)
-                    brand_filters.append(brand_filter)
-
-                # Combine the brand filters using the | operator
-                combined_brand_filters = Q()
-                for brand_filter in brand_filters:
-                    combined_brand_filters |= brand_filter
-
-                # Filter records based on user input and exclude records where 'available' is 0
-                filtered_data = SlowMoversReport.objects.filter(
-                    Q(sellercategory__in=sellercategory),
-                    combined_brand_filters,
-                    available__gt=0  # Greater than 0
-                )
-
-                # Create a DataFrame 'df' from the 'filtered_data'
-                df = pd.DataFrame(list(filtered_data.values()))
-                # Store the DataFrame in the session
-                request.session['filtered_data_df'] = df.to_json(orient='split')
-
-                # Render the filtered data in a new template
-                return render(request, 'admin/offers/brandoffer/filtered_data.html', {'filtered_data': filtered_data})
-
-            return render(request, 'admin/offers/brandoffer/offer_generation.html', {'value': queryset})
+#============================================URLS PATHS==============================================
 
     generate_offers.short_description = 'Generate Brand Offers'
 
@@ -646,7 +1058,7 @@ class BrandOfferAdmin(admin.ModelAdmin):
         urls = super().get_urls()
         custom_urls = [
             #error page
-            path('error_page/',self.admin_site.admin_view(self.error_page),name='error_page'),
+            path('error/',self.admin_site.admin_view(self.error),name='error'),
             #paths
             path('generate_offers/', self.admin_site.admin_view(self.generate_offers), name='generate_offers'),
             path('filter_offers/', self.admin_site.admin_view(self.filter_offers), name='filter_offers'),
@@ -665,11 +1077,24 @@ class BrandOfferAdmin(admin.ModelAdmin):
             path('save_offer/',self.admin_site.admin_view(self.save_offer), name='save_offer'),
             #Load customer Data
             path('email_customers/reset/', self.admin_site.admin_view(self.reset_customers_df), name='reset_customers_df'),
-
+            path('email_customers/reset_salon/', self.admin_site.admin_view(self.reset_customers_df_salon), name='reset_customers_df_salon'),
             # Remove Email
             path('remove_customer/<str:customer_id>/', self.admin_site.admin_view(self.remove_customer), name='remove_customer'),
+            path('remove_customer_salon/<str:customer_id>/', self.admin_site.admin_view(self.remove_customer_salon), name='remove_customer_salon'),
             # Email Brand and Salon Offer to Customer 
             path('email_customers/',self.admin_site.admin_view(self.email_customers),name='email_customers'),
+            path('email_customers_salon/',self.admin_site.admin_view(self.email_customers_salon),name='email_customers_salon'),
+            # Send Email 
+            path('send_email_customers/',self.admin_site.admin_view(self.send_email_customers),name='send_email_customers'),
+            path('send_email_customers_salon/',self.admin_site.admin_view(self.send_email_customers_salon),name='send_email_customers_salon'),
+            # Save Without Redirection 
+            path('save_offer_without_redirect/',self.admin_site.admin_view(self.save_offer_without_redirect),name='save_offer_without_redirect'),
+            path('save_offer_without_redirect_salon/',self.admin_site.admin_view(self.save_offer_without_redirect_salon),name='save_offer_without_redirect_salon'),
+            # Commit Send Emails
+            path('commit_send_emails/',self.admin_site.admin_view(self.commit_send_emails),name='commit_send_emails'),
+            path('commit_send_emails_salon/',self.admin_site.admin_view(self.commit_send_emails_salon),name='commit_send_emails_salon'),
+            # sucess 
+            path('success/', self.admin_site.admin_view(self.success), name='success'),
         ]
         return custom_urls + urls
     class Media:
