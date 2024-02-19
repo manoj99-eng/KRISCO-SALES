@@ -1,6 +1,8 @@
 from io import BytesIO, StringIO  # You already have these for handling in-memory files
 import json  # Existing
 import os
+from django.conf.urls.static import static
+from django.conf import settings
 from django.urls import path, reverse  # Existing
 from django.contrib import admin  # Existing
 from django.shortcuts import get_object_or_404, render, redirect  # Existing
