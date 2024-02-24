@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path
 from .views import WeeklyOffersView, AddToPreviewView, update_quantity_view, SubmitPreviewView, ThankYouView
-
+from . import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
