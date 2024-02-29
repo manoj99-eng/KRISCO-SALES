@@ -1,0 +1,8 @@
+djnago==3.1.4
+django-crispy-forms==1.11.2
+django-daterange-filterspec
+pillow
+pandas
+mysql-client
+openpyxl
+django-multiselectfield
