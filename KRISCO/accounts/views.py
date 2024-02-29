@@ -33,6 +33,8 @@ def login(request):
 def register(request):
     if request.method == 'POST':
         email = request.POST['email']
+        first_name = request.POST['first_name']
+        last_name = request.POST['last_name']
         password = request.POST['password']
         username = request.POST['username']
 
@@ -44,7 +46,7 @@ def register(request):
             return redirect("register")
         else:
             user = User.objects.create_user(
-                username=username, password=password, email=email)
+                username=username, password=password, email=email,first_name=first_name,last_name=last_name)
             mydict = {'username': username}
             user.save()
             # html_template = 'register_email.html'

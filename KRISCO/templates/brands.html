@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+<header>
+  {% block menubar %}{% endblock %}
+</header>
+{% block content %}
+<style>
+  .pagination {
+    display: flex;
+    list-style: none;
+    padding: 0;
+}
+
+.pagination a {
+    margin: 0 5px;
+    color: black;
+    text-decoration: none;
+}
+
+
+.pagination .current {
+    background-color: black;
+    color: white;
+    border-radius: 50%;
+    padding: 5px 10px;
+}
+
+.pagination .current span {
+    padding: 5px 10px;
+}
+
+.pagination .dot {
+    margin: 0 2px;
+}
+
+.pagination .next, .pagination .prev {
+    font-weight: bold;
+}
+
+.pagination .disabled {
+    color: grey;
+}
+
+/* Additional styling to ensure enough spacing and centering */
+.pagination .spacer {
+    flex: 1;
+}
+
+.pagination li:first-child .current, .pagination li:last-child .current {
+    background: none;
+    color: black;
+}
+
+/* Styles for non-active page numbers */
+.pagination li a {
+    border: 1px solid transparent; /* Makes the non-active page numbers without border */
+    padding: 5px 10px;
+    border-radius: 50%; /* Circle shape */
+}
+
+/* Hover effect for non-active page numbers */
+.pagination li a:hover {
+    border-color: black;
+}
+  .container-brand{
+    margin: 0 auto;
+    padding: 40px;
+  }
+  .image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Adjust minmax to your desired image size */
+    gap: 10px; /* Adjust the gap size as needed */
+    padding: 10px;
+    justify-items: center;
+  }
+
+  .image-grid-item {
+    border: 2px solid rgb(132, 132, 135); /* Adjust border color and width as needed */
+    padding: 5px; /* Adjust padding as needed */
+    width: 200px; /* Adjust width as needed */
+    height: 200px; /* Adjust height as needed */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden; /* To handle images larger than the container */
+  }
+
+  .image-grid-item img {
+  width: 100%;       /* Full width of the container */
+  height: 100%;      /* Full height of the container */
+  object-fit: contain; /* Ensures the entire image fits inside the bounding box */
+  display: fill;    /* Remove extra space below the image */
+  }
+
+</style>
+</head>
+<body>
+  <div class="container-brand">
+    <h4>BRANDS WE OFFER</h4>
+    <div class="image-grid">
+      {% for brand in page_obj %}
+      <div class="section">
+        <div class="image-grid-item">
+          <img src="{{ brand.image.url }}" alt="{{ brand.brand_name }}">
+        </div>
+        <center><span style="font-family: sans-serif;">{{ brand.brand_name }}</span></center>
+      </div>
+      {% endfor %}
+    </div>
+  
+    <!-- Pagination navigation -->
+    <ul class="pagination">
+      {% if page_obj.has_previous %}
+          <li><a href="?page=1" class="prev">&laquo; First</a></li>
+          <li><a href="?page={{ page_obj.previous_page_number }}" class="prev">Previous</a></li>
+      {% else %}
+          <li><span class="disabled">&laquo; First</span></li>
+          <li><span class="disabled">Previous</span></li>
+      {% endif %}
+
+      {% for num in page_obj.paginator.page_range %}
+          {% if page_obj.number == num %}
+              <li><a href="?page={{ num }}" class="current">{{ num }}</a></li>
+          {% else %}
+              <li><a href="?page={{ num }}">{{ num }}</a></li>
+          {% endif %}
+      {% endfor %}
+
+      {% if page_obj.has_next %}
+          <li><a href="?page={{ page_obj.next_page_number }}" class="next">Next</a></li>
+          <li><a href="?page={{ page_obj.paginator.num_pages }}" class="next">Last &raquo;</a></li>
+      {% else %}
+          <li><span class="disabled">Next</span></li>
+          <li><span class="disabled">Last &raquo;</span></li>
+      {% endif %}
+  </ul>
+  </div>
+</body>
+{% endblock %}

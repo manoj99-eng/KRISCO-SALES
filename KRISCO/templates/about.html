@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+<header>
+    {% block menubar %}{% endblock %}
+</header>
+{% block content %}
+<head>
+    <link rel="canonical" href="https://getbootstrap.com/docs/5.3/examples/jumbotron/">
+    <style>
+        .bd-placeholder-img {
+            font-size: 1.125rem;
+            text-anchor: middle;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            user-select: none;
+        }
+
+        @media (min-width: 768px) {
+            .bd-placeholder-img-lg {
+                font-size: 3.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <div class="p-5 mb-4 bg-light rounded-3"
+            style="background-image: url('https://dl.dropbox.com/scl/fi/0zy5o6sll5iylzty7f4ba/download.png?rlkey=mdtw40u7mcgtljw8dryx6ilko&dl=0'); background-size: cover; background-position: center; height: 80vh; position: relative;">
+            <div class="container-fluid" style="position: absolute; top: 5; left: 10; color: aliceblue;">
+                <h1 class="display-5 fw-bold">About Us</h1>
+                <p class="col-md-5 fs-5" style="color: white; text-align: justify;" >Krisco Sales LLC is a leading distributor of skincare and haircare
+                    products from around the world. Founded in 2008, we
+                    are proud to have grown into an international buyer and seller of luxury and wholesale goods. Our offices
+                    are
+                    located in New Jersey and Ontario, Canada, and we have established relationships with over a thousand
+                    suppliers from around the world.</p>
+                <button class="btn btn-primary btn-lg" type="button"onclick="scrollToEnd()"><a href="javascript:void(0)"
+    style="color: white; text-decoration: none;">Read More</a></button>
+            </div>
+        </div>
+
+        <div class="row align-items-md-stretch">
+            <div class="col-md-6">
+                <div class="h-100 p-5 text-white bg-dark rounded-3">
+                    <h2>Krisco Speciality</h2>
+                    <p class="col-md-9 fs-5" style="text-align: justify;"> We specialize in connecting customers to the best quality products available, and are dedicated to providing our
+                    customers with the highest level of customer service. We would love to get to business with you. Visit the contact us
+                    page so that we can get started right away.</p>
+                    <button class="btn btn-outline-secondary" type="button"><a href="/contact" style="color: aliceblue;text-decoration: none;">Contact Us</a></button>
+                </div>
+            </div>
+                <div class="col-md-6">
+                    <div class="h-100 p-5 bg-light border rounded-3">
+                        <h2>Our Team</h2>
+                        <p class="col-md-9 fs-5" style="text-align: justify;">Starting the business back in 2008, we have grown the team to 50 employees and built an incredibly close knit team that
+                        celebrates every occasion together. From the strong communication to the collective decisions made, CEO Bob has brought
+                        everyone together and fostered a high level of trust.</p>
+                        <button class="btn btn-outline-dark" type="button"><a href="/team" style="color: grey;text-decoration: none;">Reach Team</a></button>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="pt-3 mt-4 text-muted border-top">
+                &copy; 2024 KRISCO SALES LLC
+            </footer>
+        </div>
+    </main>
+<script>
+    function scrollToEnd() {
+        window.scrollTo({
+            top: document.body.scrollHeight,
+            behavior: 'smooth'
+        });
+    }
+</script>
+</body>
+{% endblock %}
